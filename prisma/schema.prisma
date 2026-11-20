@@ -813,6 +813,9 @@ model YoutubePublication {
   uploadSessionUriEncrypted String?
   uploadOffset             BigInt   @default(0)
   uploadAttempts           Int      @default(0)
+  maxUploadAttempts        Int      @default(8)
+  nextAttemptAt            DateTime @default(now())
+  lastAttemptAt            DateTime?
   lockedAt                 DateTime?
   lockedBy                 String?
   youtubeVideoId           String?  @unique
@@ -826,6 +829,8 @@ model YoutubePublication {
 
   @@index([userId, status, createdAt])
   @@index([status, scheduledAt])
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedAt])
   @@index([channelId, createdAt])
   @@index([videoProjectId])
 }

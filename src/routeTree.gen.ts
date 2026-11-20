@@ -21,6 +21,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TosRouteImport } from './routes/tos'
 import { Route as ProtectedDashboardRouteImport } from './routes/_protected.dashboard'
+import { Route as ProtectedDashboardPublishingRouteImport } from './routes/_protected.dashboard.publishing'
 import { Route as ApiAiProvidersRouteImport } from './routes/api.ai-providers'
 import { Route as ApiContactRouteImport } from './routes/api.contact'
 import { Route as ApiGenerateRouteImport } from './routes/api.generate'
@@ -242,6 +243,11 @@ const ProtectedDashboardVideosRoute =
     path: '/videos',
     getParentRoute: () => ProtectedDashboardRoute,
   } as any)
+const ProtectedDashboardPublishingRoute = ProtectedDashboardPublishingRouteImport.update({
+  id: '/publishing',
+  path: '/publishing',
+  getParentRoute: () => ProtectedDashboardRoute,
+} as any)
 const ProtectedDashboardResearchRoute = ProtectedDashboardResearchRouteImport.update({
   id: '/research',
   path: '/research',
@@ -315,6 +321,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/studio': typeof ProtectedDashboardStudioRoute
   '/dashboard/strategy': typeof ProtectedDashboardStrategyRoute
   '/dashboard/revenue': typeof ProtectedDashboardRevenueRoute
+  '/dashboard/publishing': typeof ProtectedDashboardPublishingRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -415,6 +422,7 @@ export interface FileRoutesById {
   '/_protected/dashboard/studio': typeof ProtectedDashboardStudioRoute
   '/_protected/dashboard/strategy': typeof ProtectedDashboardStrategyRoute
   '/_protected/dashboard/revenue': typeof ProtectedDashboardRevenueRoute
+  '/_protected/dashboard/publishing': typeof ProtectedDashboardPublishingRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -466,6 +474,7 @@ export interface FileRouteTypes {
     | '/dashboard/studio'
     | '/dashboard/strategy'
     | '/dashboard/revenue'
+    | '/dashboard/publishing'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -515,6 +524,7 @@ export interface FileRouteTypes {
     | '/dashboard/studio'
     | '/dashboard/strategy'
     | '/dashboard/revenue'
+    | '/dashboard/publishing'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -565,6 +575,7 @@ export interface FileRouteTypes {
     | '/_protected/dashboard/studio'
     | '/_protected/dashboard/strategy'
     | '/_protected/dashboard/revenue'
+    | '/_protected/dashboard/publishing'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -816,6 +827,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedDashboardStrategyRouteImport
       parentRoute: typeof ProtectedDashboardRoute
     }
+    '/_protected/dashboard/publishing': {
+      id: '/_protected/dashboard/publishing'
+      path: '/publishing'
+      fullPath: '/dashboard/publishing'
+      preLoaderRoute: typeof ProtectedDashboardPublishingRouteImport
+      parentRoute: typeof ProtectedDashboardRoute
+    }
     '/_protected/dashboard/revenue': {
       id: '/_protected/dashboard/revenue'
       path: '/revenue'
@@ -941,6 +959,7 @@ declare module '@tanstack/react-router' {
 interface ProtectedDashboardRouteChildren {
   ProtectedDashboardStrategyRoute: typeof ProtectedDashboardStrategyRoute
   ProtectedDashboardRevenueRoute: typeof ProtectedDashboardRevenueRoute
+  ProtectedDashboardPublishingRoute: typeof ProtectedDashboardPublishingRoute
   ProtectedDashboardStudioRoute: typeof ProtectedDashboardStudioRoute
   ProtectedDashboardHistoryRoute: typeof ProtectedDashboardHistoryRoute
   ProtectedDashboardMessagesRoute: typeof ProtectedDashboardMessagesRoute
@@ -954,6 +973,7 @@ interface ProtectedDashboardRouteChildren {
 const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
   ProtectedDashboardStrategyRoute: ProtectedDashboardStrategyRoute,
   ProtectedDashboardRevenueRoute: ProtectedDashboardRevenueRoute,
+  ProtectedDashboardPublishingRoute: ProtectedDashboardPublishingRoute,
   ProtectedDashboardStudioRoute: ProtectedDashboardStudioRoute,
   ProtectedDashboardHistoryRoute: ProtectedDashboardHistoryRoute,
   ProtectedDashboardMessagesRoute: ProtectedDashboardMessagesRoute,

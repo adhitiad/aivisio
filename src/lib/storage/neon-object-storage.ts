@@ -196,13 +196,13 @@ export async function putFile(key: string, filePath: string, contentType: string
   return { size: fileStat.size, sha256 }
 }
 
-export async function headObject(key: string): Promise<ObjectHead | null> {
+export async function headObject(key: string, timeoutMs?: number): Promise<ObjectHead | null> {
   const config = getConfig()
   const signed = signRequest(config, 'HEAD', key, EMPTY_SHA256)
   const response = await fetch(signed.url, {
     method: 'HEAD',
     headers: signed.headers,
-    signal: timeoutSignal(),
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : timeoutSignal(),
   })
   if (response.status === 404) return null
   await assertOk(response, 'HEAD')
@@ -213,7 +213,7 @@ export async function headObject(key: string): Promise<ObjectHead | null> {
   }
 }
 
-export async function getObject(key: string, range?: string): Promise<Response | null> {
+export async function getObject(key: string, range?: string, timeoutMs?: number): Promise<Response | null> {
   const config = getConfig()
   const signed = signRequest(config, 'GET', key, EMPTY_SHA256)
   const headers: Record<string, string> = { ...signed.headers }
@@ -221,7 +221,7 @@ export async function getObject(key: string, range?: string): Promise<Response |
   const response = await fetch(signed.url, {
     method: 'GET',
     headers,
-    signal: timeoutSignal(),
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : timeoutSignal(),
   })
   if (response.status === 404) return null
   await assertOk(response, 'GET')

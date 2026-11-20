@@ -13,6 +13,7 @@ import {
   Settings,
   Target,
   TrendingUp,
+  Youtube,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import {
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/dashboard/analytics", key: "analytics", icon: ChartLine, exact: false },
   { href: "/dashboard/revenue", key: "revenueNav", icon: TrendingUp, exact: false },
   { href: "/dashboard/studio", key: "creatorStudioNav", icon: Clapperboard, exact: false },
+  { href: "/dashboard/publishing", key: "publishing", icon: Youtube, exact: false },
   { href: "/dashboard/providers", key: "providers", icon: Plug, exact: false },
   { href: "/dashboard/messages", key: "messages", icon: Mail, exact: false },
   { href: "/dashboard/settings", key: "settings", icon: Settings, exact: false },
