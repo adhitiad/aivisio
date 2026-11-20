@@ -142,7 +142,7 @@ export async function createYoutubeAuthorizationUrl(userId: string): Promise<str
   url.searchParams.set('client_id', config.clientId)
   url.searchParams.set('redirect_uri', config.redirectUri)
   url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', [...OPENID_SCOPES, ...REQUIRED_SCOPES, MONETARY_SCOPE].join(' '))
+  url.searchParams.set('scope', [...OPENID_SCOPES, ...REQUIRED_SCOPES, 'https://www.googleapis.com/auth/youtube.upload', MONETARY_SCOPE].join(' '))
   url.searchParams.set('access_type', 'offline')
   url.searchParams.set('include_granted_scopes', 'true')
   url.searchParams.set('prompt', 'consent')

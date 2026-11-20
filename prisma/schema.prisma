@@ -31,6 +31,7 @@ model User {
   youtubeChannels YoutubeChannel[]
   youtubeOAuthConnection YoutubeOAuthConnection?
   youtubeOAuthStates YoutubeOAuthState[]
+  youtubePublications YoutubePublication[]
   trackedMarketTopics YoutubeTrackedMarketTopic[]
   notifications Notification[]
   notificationReadReceipts NotificationReadReceipt[]
@@ -138,6 +139,7 @@ model VideoProject {
   fileBytes       Int      @default(0)
   scenes          String   @default("[]")
   videoJob        VideoJob?
+  youtubePublications YoutubePublication[]
   thumbnailVariants ThumbnailVariant[]
   mediaAssets     MediaAsset[]
   error           String?
@@ -183,6 +185,7 @@ model YoutubeChannel {
   account           Account?                @relation(fields: [accountId], references: [id], onDelete: SetNull)
   oauthConnection   YoutubeOAuthConnection? @relation(fields: [oauthConnectionId], references: [id], onDelete: SetNull)
   analyticsDailyMetrics YoutubeAnalyticsDailyMetric[]
+  publications YoutubePublication[]
   goal              YoutubeGoal?
   metricSnapshots   YoutubeMetricSnapshot[]
   trendSignals      YoutubeTrendSignal[]
@@ -790,4 +793,39 @@ model YoutubeRevenueForecast {
 
   @@index([channelId, createdAt])
   @@index([createdAt])
+}
+
+
+model YoutubePublication {
+  id                       String   @id @default(uuid(7))
+  userId                   String
+  channelId                String
+  videoProjectId           String
+  idempotencyKey           String   @unique
+  status                   String   @default("pending_approval")
+  title                    String
+  description              String   @default("")
+  tags                     String   @default("[]")
+  privacyStatus            String   @default("private")
+  scheduledAt              DateTime?
+  approvedAt               DateTime?
+  approvedBy               String?
+  uploadSessionUriEncrypted String?
+  uploadOffset             BigInt   @default(0)
+  uploadAttempts           Int      @default(0)
+  lockedAt                 DateTime?
+  lockedBy                 String?
+  youtubeVideoId           String?  @unique
+  publishedAt              DateTime?
+  lastError                String?
+  user                     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel                  YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  videoProject             VideoProject  @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([status, scheduledAt])
+  @@index([channelId, createdAt])
+  @@index([videoProjectId])
 }
