@@ -11,6 +11,8 @@ import {
   Plug,
   Search,
   Settings,
+  Target,
+  TrendingUp,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import {
@@ -29,7 +31,9 @@ const NAV = [
   { href: "/dashboard/history", key: "history", icon: History, exact: false },
   { href: "/dashboard/videos", key: "videos", icon: Clapperboard, exact: false },
   { href: "/dashboard/research", key: "research", icon: Search, exact: false },
+  { href: "/dashboard/strategy", key: "strategyNav", icon: Target, exact: false },
   { href: "/dashboard/analytics", key: "analytics", icon: ChartLine, exact: false },
+  { href: "/dashboard/revenue", key: "revenueNav", icon: TrendingUp, exact: false },
   { href: "/dashboard/studio", key: "creatorStudioNav", icon: Clapperboard, exact: false },
   { href: "/dashboard/providers", key: "providers", icon: Plug, exact: false },
   { href: "/dashboard/messages", key: "messages", icon: Mail, exact: false },

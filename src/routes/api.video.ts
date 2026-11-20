@@ -21,6 +21,7 @@ import { sameOriginGuard } from '@/lib/security/http'
 const log = moduleLogger('api-video')
 const createSchema = z.object({
   topic: z.string().trim().min(5).max(300),
+  contentIdeaId: z.string().uuid().optional(),
   format: z.enum(['short', 'long']).optional(),
   renderMode: z.enum(['cinematic', 'fast']).optional(),
   style: z.string().max(80).optional(),
@@ -29,6 +30,44 @@ const createSchema = z.object({
   targetScenes: z.number().int().optional(),
   aspect: z.string().max(8).optional(),
 }).strict()
+
+function safeStrategyContext(snapshotPayload: string | undefined): string {
+  if (!snapshotPayload) return ''
+  let parsed: unknown
+  try { parsed = JSON.parse(snapshotPayload) } catch { return '' }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return ''
+  const value = parsed as Record<string, unknown>
+  const cleanText = (item: unknown, max = 420): string =>
+    typeof item === 'string'
+      ? Array.from(item, (character) => {
+        const codePoint = character.codePointAt(0) ?? 0
+        return codePoint <= 0x1f || codePoint === 0x7f ? ' ' : character
+      }).join('').trim().slice(0, max)
+      : ''
+  const cleanList = (item: unknown): string[] =>
+    Array.isArray(item)
+      ? item.filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => cleanText(entry, 140)).filter(Boolean).slice(0, 8)
+      : []
+  const lines = [
+    ['Profile version', cleanText(value.profileVersion, 24)],
+    ['Niche', cleanText(value.niche, 120)],
+    ['Sub-niche', cleanText(value.subNiche, 120)],
+    ['Primary market', cleanText(value.primaryMarket, 12)],
+    ['Secondary markets', cleanList(value.secondaryMarkets).join(', ')],
+    ['Audience persona', cleanText(value.audiencePersona)],
+    ['Audience needs', cleanList(value.audienceProblems).join('; ')],
+    ['Channel positioning', cleanText(value.channelPositioning)],
+    ['Content pillars', cleanList(value.contentPillars).join(', ')],
+    ['Languages', cleanList(value.languages).join(', ')],
+    ['Short-form direction', cleanText(value.shortStrategy)],
+    ['Long-form direction', cleanText(value.longFormStrategy)],
+    ['Preferred hook', cleanText(value.defaultHook)],
+    ['Outline template', cleanText(value.outlineTemplate)],
+    ['Primary CTA', cleanText(value.callToAction)],
+  ].filter(([, item]) => item)
+  return lines.map(([label, item]) => label + ': ' + item).join('\n').slice(0, 5_000)
+}
 
 function agentSummary(scenes: SceneState[]) {
   return Array.from({ length: AGENT_COUNT }, (_, index) => {
@@ -88,7 +127,25 @@ export const Route = createFileRoute('/api/video')({
           }
 
           const input = parsed.data
-          const format = input.format ?? 'short'
+          const contentIdea = input.contentIdeaId
+            ? await db.contentIdea.findFirst({
+                where: { id: input.contentIdeaId, channel: { is: { userId: session.user.id } } },
+                include: {
+                  strategySnapshots: { orderBy: { createdAt: 'desc' }, take: 1, select: { payload: true } },
+                  videoProjects: { where: { status: { in: ['queued', 'planning', 'building', 'stitching'] } }, take: 1, select: { id: true } },
+                },
+              })
+            : null
+          if (input.contentIdeaId && !contentIdea) {
+            return Response.json({ error: 'Ide konten tidak ditemukan atau bukan milik akun ini.' }, { status: 404 })
+          }
+          if (contentIdea?.videoProjects.length) {
+            return Response.json({ error: 'Ide ini masih memiliki project video yang sedang diproses.' }, { status: 409 })
+          }
+          if (contentIdea && input.format && input.format !== contentIdea.format) {
+            return Response.json({ error: 'Format video harus sesuai dengan format ide konten.' }, { status: 400 })
+          }
+          const format = input.format ?? (contentIdea?.format === 'long' ? 'long' : 'short')
           const renderMode = input.renderMode ?? 'cinematic'
           const styleId = STYLES.some((style) => style.id === input.style)
             ? input.style!
@@ -123,10 +180,20 @@ export const Route = createFileRoute('/api/video')({
             )
           }
 
+          const strategyContext = safeStrategyContext(contentIdea?.strategySnapshots[0]?.payload)
           const created = await db.$transaction(async (tx) => {
+            if (contentIdea) {
+              const activeProject = await tx.videoProject.findFirst({
+                where: { contentIdeaId: contentIdea.id, status: { in: ['queued', 'planning', 'building', 'stitching'] } },
+                select: { id: true },
+              })
+              if (activeProject) throw new Error('CONTENT_IDEA_ALREADY_PROCESSING')
+            }
             const project = await tx.videoProject.create({
               data: {
                 userId: session.user.id,
+                contentIdeaId: contentIdea?.id ?? null,
+                strategyContext,
                 topic: input.topic,
                 format,
                 style: styleId,
@@ -140,6 +207,9 @@ export const Route = createFileRoute('/api/video')({
               },
             })
             await tx.videoJob.create({ data: { videoProjectId: project.id } })
+            if (contentIdea) {
+              await tx.contentIdea.update({ where: { id: contentIdea.id }, data: { status: 'producing' } })
+            }
             return project
           })
           try {
@@ -154,6 +224,9 @@ export const Route = createFileRoute('/api/video')({
           )
           return Response.json({ id: created.id, status: created.status, queue: 'queued' }, { status: 202 })
         } catch (err) {
+          if (err instanceof Error && err.message === 'CONTENT_IDEA_ALREADY_PROCESSING') {
+            return Response.json({ error: 'Ide ini sudah memiliki project video yang sedang diproses.' }, { status: 409 })
+          }
           log.error(
             { err: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
             'video POST error',

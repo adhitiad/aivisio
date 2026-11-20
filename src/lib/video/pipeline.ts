@@ -354,7 +354,7 @@ export async function runVideoPipeline(id: string) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const raw = await chatComplete(
-          buildPlannerMessages(project.topic, format, style.label, style.prompt, sceneCount, researchDigest),
+          buildPlannerMessages(project.topic, format, style.label, style.prompt, sceneCount, researchDigest, project.strategyContext || undefined),
         )
         sb = parseStoryboard(raw, sceneCount)
         break
@@ -540,6 +540,10 @@ export async function runVideoPipeline(id: string) {
         scenes: JSON.stringify(scenes),
       },
     })
+    if (project.contentIdeaId) {
+      await db.contentIdea.updateMany({ where: { id: project.contentIdeaId }, data: { status: 'produced' } })
+        .catch((statusError) => log.warn({ id, err: statusError instanceof Error ? statusError.message.slice(0, 120) : 'unknown' }, 'content idea status update failed'))
+    }
     await fsp.rm(dir, { recursive: true, force: true }).catch((cleanupError) => {
       log.warn({ id, err: cleanupError instanceof Error ? cleanupError.message.slice(0, 160) : 'unknown' }, 'temporary render directory cleanup failed')
     })
@@ -549,6 +553,9 @@ export async function runVideoPipeline(id: string) {
     await db.videoProject
       .update({ where: { id }, data: { status: 'error', error: msg.slice(0, 500) } })
       .catch(() => {})
+    if (project.contentIdeaId) {
+      await db.contentIdea.updateMany({ where: { id: project.contentIdeaId }, data: { status: 'production_failed' } }).catch(() => {})
+    }
     throw err
   }
 }
