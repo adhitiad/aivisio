@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { getZAI } from '@/lib/zai'
 import { chatComplete } from '@/lib/ai/router'
 import { moduleLogger } from '@/lib/logger'
+import { headObject, isNeonStorageConfigured, putFile } from '@/lib/storage/neon-object-storage'
 import {
   AGENT_COUNT,
   DIMS,
@@ -24,6 +25,7 @@ import {
   concatScenes,
   ensureDir,
   extractThumb,
+  fileExists,
   gradientToClip,
   imageToClip,
   makeSilence,
@@ -47,6 +49,7 @@ export type SceneState = {
   agent: number | null
   asset: SceneAsset
   error?: string
+  thumbObjectKey?: string
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -297,11 +300,15 @@ async function processScene(ctx: PipelineCtx, scene: SceneState, agentId: number
   }
 }
 
-async function runVideoPipeline(id: string) {
+export async function runVideoPipeline(id: string) {
   const project = await db.videoProject.findUnique({ where: { id } })
   if (!project) return
 
   try {
+    if (!isNeonStorageConfigured()) {
+      throw new Error('Neon Object Storage wajib dikonfigurasi sebelum video diproduksi. Periksa AWS_ENDPOINT_URL_S3, bucket, dan kredensial storage:read/storage:write.')
+    }
+
     // ===== Tahap 0: RISET WEB (khusus Short, opsional) =====
     let researchDigest: string | undefined
     if (project.format === 'short' && project.researchEnabled) {
@@ -461,18 +468,80 @@ async function runVideoPipeline(id: string) {
     await concatScenes(orderedClips, finalPath, path.join(dir, 'list.txt'))
     const duration = await probeDuration(finalPath)
     const bytes = (await fsp.stat(finalPath)).size
+    const ownerPrefix = project.userId || 'system'
+    const objectPrefix = 'media/users/' + ownerPrefix + '/projects/' + id
+
+    // A scene thumbnail is a production asset only after its remote copy is verified.
+    for (const scene of scenes) {
+      const localThumb = path.join(dir, 'scene-' + scene.idx + '.jpg')
+      if (!(await fileExists(localThumb))) continue
+      const key = objectPrefix + '/scenes/scene-' + scene.idx + '.jpg'
+      const uploaded = await putFile(key, localThumb, 'image/jpeg')
+      const head = await headObject(key)
+      if (!head || head.size !== uploaded.size || head.sha256 !== uploaded.sha256) {
+        throw new Error('Verifikasi Object Storage gagal untuk thumbnail scene ' + scene.idx + '.')
+      }
+      await db.mediaAsset.upsert({
+        where: { objectKey: key },
+        create: {
+          userId: project.userId,
+          videoProjectId: id,
+          kind: 'scene_thumbnail',
+          objectKey: key,
+          mimeType: 'image/jpeg',
+          sizeBytes: BigInt(uploaded.size),
+          sha256: uploaded.sha256,
+          originalName: 'scene-' + scene.idx + '.jpg',
+        },
+        update: {
+          sizeBytes: BigInt(uploaded.size),
+          sha256: uploaded.sha256,
+          originalName: 'scene-' + scene.idx + '.jpg',
+        },
+      })
+      scene.thumbObjectKey = key
+    }
+
+    const finalObjectKey = objectPrefix + '/final/video.mp4'
+    const uploadedVideo = await putFile(finalObjectKey, finalPath, 'video/mp4')
+    const verifiedVideo = await headObject(finalObjectKey)
+    if (!verifiedVideo || verifiedVideo.size !== bytes || verifiedVideo.sha256 !== uploadedVideo.sha256) {
+      throw new Error('Verifikasi video final di Neon Object Storage gagal.')
+    }
+    await db.mediaAsset.upsert({
+      where: { objectKey: finalObjectKey },
+      create: {
+        userId: project.userId,
+        videoProjectId: id,
+        kind: 'final_video',
+        objectKey: finalObjectKey,
+        mimeType: 'video/mp4',
+        sizeBytes: BigInt(bytes),
+        sha256: uploadedVideo.sha256,
+        originalName: 'final.mp4',
+      },
+      update: {
+        sizeBytes: BigInt(bytes),
+        sha256: uploadedVideo.sha256,
+        originalName: 'final.mp4',
+      },
+    })
 
     await db.videoProject.update({
       where: { id },
       data: {
         status: 'done',
         progress: 100,
-        stageDetail: 'Video siap ditonton',
+        stageDetail: 'Video tersimpan aman di Object Storage',
         durationSec: Math.round(duration),
-        filePath: finalPath,
+        filePath: null,
+        fileObjectKey: finalObjectKey,
         fileBytes: bytes,
         scenes: JSON.stringify(scenes),
       },
+    })
+    await fsp.rm(dir, { recursive: true, force: true }).catch((cleanupError) => {
+      log.warn({ id, err: cleanupError instanceof Error ? cleanupError.message.slice(0, 160) : 'unknown' }, 'temporary render directory cleanup failed')
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Kesalahan tidak diketahui'
@@ -480,6 +549,7 @@ async function runVideoPipeline(id: string) {
     await db.videoProject
       .update({ where: { id }, data: { status: 'error', error: msg.slice(0, 500) } })
       .catch(() => {})
+    throw err
   }
 }
 
