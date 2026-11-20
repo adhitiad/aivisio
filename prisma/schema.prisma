@@ -18,6 +18,7 @@ model User {
   name          String
   email         String         @unique
   emailVerified Boolean        @default(false)
+  role          String         @default("CREATOR")
   image         String?
   provider      String? // legacy: penyedia OAuth pertama kali (google | facebook)
   sessions      Session[]
@@ -26,10 +27,12 @@ model User {
   videoProjects VideoProject[]
   youtubeChannels YoutubeChannel[]
   notifications Notification[]
+  notificationReadReceipts NotificationReadReceipt[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([email])
+  @@index([role])
   @@index([createdAt])
 }
 
@@ -276,6 +279,7 @@ model Notification {
   read      Boolean  @default(false)
   link      String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readReceipts NotificationReadReceipt[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -306,4 +310,22 @@ model ContactMessage {
 
   @@index([status])
   @@index([createdAt])
+}
+
+
+// Per-user read and dismissal state for global broadcast notifications.
+model NotificationReadReceipt {
+  id             String       @id @default(uuid(7))
+  notificationId String
+  userId         String
+  read           Boolean      @default(false)
+  dismissed      Boolean      @default(false)
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([notificationId, userId])
+  @@index([userId, createdAt])
+  @@index([notificationId])
 }

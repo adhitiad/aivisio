@@ -1,44 +1,66 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { db } from '@/lib/db'
-import { getApiSession } from '@/lib/session'
+import { adminGate } from '@/lib/admin-gate'
+import { sameOriginGuard } from '@/lib/security/http'
 
 export const Route = createFileRoute('/api/messages')({
   server: {
     handlers: {
       GET: async () => {
-        const session = await getApiSession()
-        if (!session) return Response.json({ error: 'Belum masuk.' }, { status: 401 })
+        const denied = await adminGate()
+        if (denied) return denied
+
         const items = await db.contactMessage.findMany({
           orderBy: { createdAt: 'desc' },
         })
-        return Response.json({ items })
+        return Response.json({ items }, { headers: { 'Cache-Control': 'no-store' } })
       },
 
       PATCH: async ({ request }: { request: Request }) => {
-        const session = await getApiSession()
-        if (!session) return Response.json({ error: 'Belum masuk.' }, { status: 401 })
+        const originDenied = sameOriginGuard(request)
+        if (originDenied) return originDenied
+        const denied = await adminGate()
+        if (denied) return denied
+
         let body: { id?: string; status?: string }
         try {
           body = await request.json()
         } catch {
           return Response.json({ error: 'Body tidak valid.' }, { status: 400 })
         }
-        if (!body.id || !['new', 'read', 'archived'].includes(body.status ?? '')) {
+        const status = body.status
+        if (
+          !body.id ||
+          body.id.length > 80 ||
+          typeof status !== 'string' ||
+          (status !== 'new' && status !== 'read' && status !== 'archived')
+        ) {
           return Response.json({ error: 'Parameter tidak valid.' }, { status: 400 })
         }
-        await db.contactMessage.updateMany({
+        const result = await db.contactMessage.updateMany({
           where: { id: body.id },
-          data: { status: body.status },
+          data: { status },
         })
+        if (result.count === 0) {
+          return Response.json({ error: 'Pesan tidak ditemukan.' }, { status: 404 })
+        }
         return Response.json({ ok: true })
       },
 
       DELETE: async ({ request }: { request: Request }) => {
-        const session = await getApiSession()
-        if (!session) return Response.json({ error: 'Belum masuk.' }, { status: 401 })
+        const originDenied = sameOriginGuard(request)
+        if (originDenied) return originDenied
+        const denied = await adminGate()
+        if (denied) return denied
+
         const id = new URL(request.url).searchParams.get('id')
-        if (!id) return Response.json({ error: 'Parameter id wajib.' }, { status: 400 })
-        await db.contactMessage.deleteMany({ where: { id } })
+        if (!id || id.length > 80) {
+          return Response.json({ error: 'Parameter id tidak valid.' }, { status: 400 })
+        }
+        const result = await db.contactMessage.deleteMany({ where: { id } })
+        if (result.count === 0) {
+          return Response.json({ error: 'Pesan tidak ditemukan.' }, { status: 404 })
+        }
         return Response.json({ ok: true })
       },
     },

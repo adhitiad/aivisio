@@ -45,9 +45,11 @@ menyerap pembaruan dari repository secara berkala.
 - Gunakan HTTPS dengan sertifikat valid dan set `SITE_URL` ke origin produksi.
 - Set `BETTER_AUTH_SECRET` dari nilai acak yang kuat.
 - Set `BETTER_AUTH_URL` dan `SITE_URL` secara konsisten.
-- Untuk deployment publik atau multi-user, set `ADMIN_API_GATE=1`.
+- Set `OWNER_EMAILS` ke email OAuth terverifikasi untuk bootstrap OWNER awal.
 - Gunakan kredensial OAuth Google/Facebook/Meta yang khusus untuk lingkungan
   production dan batasi redirect URI.
+- Set `PROVIDER_ENCRYPTION_KEY` dan jalankan `bun run security:encrypt-provider-keys`
+  untuk mengenkripsi API key provider lama.
 - Jangan menyimpan `.env`, API key, token, atau kredensial lain di repository.
 - Simpan data `.env` dan secret di secret manager/variabel platform produksi.
 - Batasi akses database dan jangan mengekspos port PostgreSQL ke internet.
@@ -58,11 +60,11 @@ menyerap pembaruan dari repository secara berkala.
 
 | OWASP 2025 | Kontrol saat ini | Lokasi |
 |---|---|---|
-| A01 Broken Access Control | Dashboard dilindungi session pada `beforeLoad`; endpoint pesan, pengaturan, dan notifikasi memeriksa session. Mutasi provider, riwayat, dan video dapat diwajibkan oleh `ADMIN_API_GATE`. Operasi notifikasi dibatasi ke pemilik atau broadcast. | `_protected.tsx`, `api.messages.ts`, `api.settings.ts`, `api.notifications.ts`, `admin-gate.ts` |
+| A01 Broken Access Control | OWNER/ADMIN diverifikasi server-side dari User.role atau OWNER_EMAILS terverifikasi. Pesan kontak, pengaturan global, dan AI provider memerlukan role admin. History/video menggunakan ownership user. Broadcast notification read/dismissal memakai receipt per pengguna. | `authorization.ts`, `api.messages.ts`, `api.settings.ts`, `api.notifications.ts`, `admin-gate.ts` |
 | A02 Security Misconfiguration | Header CSP, HSTS, deny framing, nosniff, Referrer-Policy, Permissions-Policy, dan cross-domain policy diterapkan global. Secret environment tidak dilacak; error dan health response tidak mengekspos stack trace database. | `vite.config.ts`, `src/start.ts`, `.gitignore`, `api.health.ts` |
-| A03 Software Supply Chain Failures | Dependency dikunci melalui `bun.lock`; perubahan dependency dan build sebaiknya ditinjau serta diaudit secara berkala. Katalog `skills/` harus dianggap sebagai bahan operasional yang perlu dipin dan ditinjau. | `package.json`, `bun.lock`, `skills/` |
-| A04 Cryptographic Failures | OAuth BetterAuth memakai secret dan cookie secure production. OAuth token dienkripsi, session JWE/cache digunakan, dan tidak ada autentikasi berbasis password. Password tidak disimpan; PostgreSQL dan API key harus dijaga transport serta konfigurasi deployment. | `src/lib/auth.ts`, `.env.example`, `prisma/schema.prisma` |
-| A05 Injection | Prisma digunakan untuk query database dan parameter `$queryRaw` literal; payload input memiliki validasi Zod pada endpoint kontak/pengaturan serta validasi eksplisit pada route lain. Tetap lakukan pembatasan panjang, allowlist, dan escaping pada lapisan output. | `src/lib/db.ts`, `api.contact.ts`, `api.settings.ts`, `api.generate.ts`, `api.video.ts` |
+| A03 Software Supply Chain Failures | Dependency dikunci melalui `bun.lock`; GitHub Actions CI menjalankan install, Prisma generate, typecheck, lint, unit tests, dan build. Katalog `skills/` tetap perlu ditinjau. | `package.json`, `bun.lock`, `.github/workflows/ci.yml`, `skills/` |
+| A04 Cryptographic Failures | OAuth token dienkripsi BetterAuth; provider API keys baru dienkripsi AES-256-GCM. Legacy provider keys harus dimigrasikan dengan script resmi. | `src/lib/auth.ts`, `src/lib/provider-secrets.ts`, `scripts/encrypt-provider-keys.ts`, `.env.example` |
+| A05 Injection | Prisma digunakan untuk query database dan parameter `$queryRaw` literal; input di endpoint kritis dibatasi ukuran, divalidasi Zod, serta memakai allowlist field. Provider URL divalidasi terhadap SSRF. | `src/lib/db.ts`, `api.contact.ts`, `api.settings.ts`, `api.generate.ts`, `api.video.ts`, `provider-security.ts` |
 | A06 Insecure Design | Formulir kontak dibatasi 5 permintaan per 10 menit per IP. BetterAuth memiliki rate limit umum dan aturan login/sign-up. Penandaan CAPTCHA bukan kontrol yang saat ini digunakan. | `src/lib/rate-limit.ts`, `api.contact.ts`, `src/lib/auth.ts` |
 | A07 Authentication Failures | Hanya OAuth Google dan Facebook/Meta yang didukung. Session berlaku 30 hari dengan refresh 24 jam dan cache cookie lima menit. Tidak ada flow password, reset password, atau MFA aplikasi bawaan. | `src/lib/auth.ts`, `_protected.tsx`, `login.tsx` |
 | A08 Software/Data Integrity Failures | Dependency melalui lockfile dan aset statis disajikan dari build aplikasi. Integrasi eksternal perlu tetap pada allowlist dan tidak boleh menerima kode/artefak yang tidak diaudit. | `bun.lock`, `vite.config.ts`, `src/lib/zai.ts`, `src/lib/video/` |
@@ -71,17 +73,18 @@ menyerap pembaruan dari repository secara berkala.
 
 ## Pembatasan kontrol yang perlu diketahui
 
-1. **Admin gate bersifat opt-in.**
-   Nilai default `ADMIN_API_GATE` kosong atau bukan `1` membolehkan mutasi
-   tertentu untuk mendukung mode single-user. Aktifkan gate pada deployment publik.
+1. **Role administration.**
+   Global administration selalu memerlukan OWNER atau ADMIN. OWNER awal dibootstrap
+   melalui OWNER_EMAILS yang diverifikasi; role lainnya harus diatur operator.
 
 2. **OAuth perlu dikonfigurasi.**
    Tanpa Google dan/atau Facebook/Meta, provider yang tidak dikonfigurasi tidak
    tersedia. Hanya OAuth yang didukung; password tidak boleh ditambahkan.
 
-3. **CSRF diterapkan pada server function.**
-   Middleware CSRF TanStack Start aktif untuk `serverFn`, sedangkan route API
-   harus tetap menjalankan origin, method, dan session checks yang sesuai.
+3. **CSRF dan origin checks.**
+   Middleware CSRF TanStack Start aktif untuk `serverFn`. Cookie-authenticated
+   mutation API juga memeriksa Origin dan Fetch Metadata. Request server-to-server
+   tanpa Origin tetap memerlukan autentikasi dan kontrol jaringan tersendiri.
 
 4. **CSP belum memakai nonce.**
    CSP saat ini mengizinkan `'unsafe-inline'` untuk script/style agar
@@ -108,7 +111,7 @@ menyerap pembaruan dari repository secara berkala.
 - Jalankan `bun run db:generate`.
 - Jalankan `bun run typecheck` dan `bun run lint`.
 - Jalankan `bun run build`.
-- Pastikan `ADMIN_API_GATE=1` pada deployment publik.
+- Pastikan `OWNER_EMAILS` dikonfigurasi dan role ADMIN hanya diberikan operator berwenang.
 - Pastikan tidak ada `.env`, secret, atau output build ter-track.
 - Uji OAuth dengan redirect URI produksi.
 - Uji session, logout, 401, 403, validasi input, dan rate limit.
@@ -132,3 +135,8 @@ Dalam ruang lingkup bila terkait dengan repository/deployment resmi AIVISO:
 Laporan tidak dianggap valid apabila hanya bergantung pada alat tanpa bukti
 reproduksi, bersifat generic best-practice, atau menguji instance milik pengguna
 tanpa izin.
+
+
+## Phase 1 additions
+
+See [docs/SECURITY-PHASE-1.md](docs/SECURITY-PHASE-1.md) for role bootstrap, provider credential encryption, SSRF controls, notification receipts, and the database update procedure.
