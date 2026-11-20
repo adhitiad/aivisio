@@ -12,6 +12,7 @@ import { ensureDir } from '@/lib/video/media'
 import { rateLimit } from '@/lib/rate-limit'
 import { sameOriginGuard } from '@/lib/security/http'
 import { hasYoutubeMonetaryScope } from '@/lib/youtube/oauth'
+import { percentageChange, summarizeRevenue } from '@/lib/youtube/revenue'
 import { moduleLogger } from '@/lib/logger'
 
 const log = moduleLogger('creator-studio')
@@ -56,22 +57,6 @@ async function readJson(request: Request) {
   const raw = await request.text()
   if (new TextEncoder().encode(raw).byteLength > 10_000) throw new Error('Payload terlalu besar.')
   return JSON.parse(raw)
-}
-function summarize(rows: Array<{ views: bigint; estimatedRevenue: number | null; estimatedAdRevenue: number | null }>) {
-  const views = rows.reduce((sum, row) => sum + row.views, 0n)
-  const count = Number(views)
-  const revenueRows = rows.filter((row) => row.estimatedRevenue !== null)
-  const adRows = rows.filter((row) => row.estimatedAdRevenue !== null)
-  const revenue = revenueRows.length ? revenueRows.reduce((sum, row) => sum + (row.estimatedRevenue ?? 0), 0) : null
-  const adRevenue = adRows.length ? adRows.reduce((sum, row) => sum + (row.estimatedAdRevenue ?? 0), 0) : null
-  return {
-    views: views.toString(),
-    estimatedRevenue: revenue,
-    estimatedAdRevenue: adRevenue,
-    rpm: revenue !== null && count > 0 ? revenue / count * 1000 : null,
-    adRpm: adRevenue !== null && count > 0 ? adRevenue / count * 1000 : null,
-    daysWithRevenue: revenueRows.length,
-  }
 }
 const utcDate = (value: string) => new Date(value + 'T00:00:00.000Z')
 
@@ -171,15 +156,14 @@ export const Route = createFileRoute('/api/studio')({
           })
           const currentRows = rows.filter((row) => row.metricDate >= start)
           const previousRows = rows.filter((row) => row.metricDate < start)
-          const current = summarize(currentRows)
-          const previous = summarize(previousRows)
-          const change = (now: number | null, before: number | null) => now === null || before === null || before === 0 ? null : (now - before) / Math.abs(before) * 100
+          const current = summarizeRevenue(currentRows)
+          const previous = summarizeRevenue(previousRows)
           return Response.json({
             channel: { id: channel.id, title: channel.title, youtubeChannelId: channel.youtubeChannelId },
             currency: currentRows[0]?.currencyCode ?? previousRows[0]?.currencyCode ?? 'IDR',
             startDate, endDate, current, previous,
-            revenueChangePct: change(current.estimatedRevenue, previous.estimatedRevenue),
-            adRevenueChangePct: change(current.estimatedAdRevenue, previous.estimatedAdRevenue),
+            revenueChangePct: percentageChange(current.estimatedRevenue, previous.estimatedRevenue),
+            adRevenueChangePct: percentageChange(current.estimatedAdRevenue, previous.estimatedAdRevenue),
             daily: currentRows.map((row) => ({
               date: row.metricDate.toISOString().slice(0, 10),
               views: row.views.toString(),
