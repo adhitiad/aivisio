@@ -40,6 +40,7 @@ import { Route as ApiAiProvidersTestRouteImport } from './routes/api.ai-provider
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as ApiNotificationsIdRouteImport } from './routes/api.notifications.$id'
 import { Route as ApiVideoFileRouteImport } from './routes/api.video.file'
+import { Route as ApiYoutubeMarketSearchRouteImport } from './routes/api.youtube.market.search'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -150,6 +151,11 @@ const ApiVideoRoute = ApiVideoRouteImport.update({
   path: '/video',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiYoutubeMarketSearchRoute = ApiYoutubeMarketSearchRouteImport.update({
+  id: '/youtube/market/search',
+  path: '/youtube/market/search',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ProtectedDashboardHistoryRoute =
   ProtectedDashboardHistoryRouteImport.update({
     id: '/history',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
   id:
     | '__root__'
     | '/'
@@ -397,6 +408,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -632,6 +644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVideoFileRouteImport
       parentRoute: typeof ApiVideoRoute
     }
+    '/api/youtube/market/search': {
+      id: '/api/youtube/market/search'
+      path: '/youtube/market/search'
+      fullPath: '/api/youtube/market/search'
+      preLoaderRoute: typeof ApiYoutubeMarketSearchRouteImport
+      parentRoute: typeof ApiRoute
+    }
   }
 }
 
@@ -712,6 +731,7 @@ interface ApiRouteChildren {
   ApiNotificationsRoute: typeof ApiNotificationsRouteWithChildren
   ApiSettingsRoute: typeof ApiSettingsRoute
   ApiVideoRoute: typeof ApiVideoRouteWithChildren
+  ApiYoutubeMarketSearchRoute: typeof ApiYoutubeMarketSearchRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -726,6 +746,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiNotificationsRoute: ApiNotificationsRouteWithChildren,
   ApiSettingsRoute: ApiSettingsRoute,
   ApiVideoRoute: ApiVideoRouteWithChildren,
+  ApiYoutubeMarketSearchRoute: ApiYoutubeMarketSearchRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 

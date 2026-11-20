@@ -329,3 +329,64 @@ model NotificationReadReceipt {
   @@index([userId, createdAt])
   @@index([notificationId])
 }
+
+
+model YoutubeMarketQuery {
+  id           String              @id @default(uuid(7))
+  cacheKey     String              @unique
+  query        String
+  market       String
+  languageCode String
+  order        String
+  periodDays   Int
+  resultCount  Int                 @default(0)
+  source       String              @default("youtube-data-api-v3")
+  observedAt   DateTime            @default(now())
+  expiresAt    DateTime
+  videos       YoutubeMarketVideo[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([market, observedAt])
+  @@index([expiresAt])
+}
+
+model YoutubeMarketVideo {
+  id              String             @id @default(uuid(7))
+  queryId         String
+  videoId         String
+  channelId       String
+  channelTitle    String
+  title           String
+  description     String?
+  publishedAt     DateTime?
+  durationSec     Int?
+  viewCount       BigInt             @default(0)
+  likeCount       BigInt             @default(0)
+  commentCount    BigInt             @default(0)
+  subscriberCount BigInt?
+  viewsPerDay     Float              @default(0)
+  engagementRate  Float              @default(0)
+  velocityIndex   Float              @default(0)
+  thumbnailUrl    String?
+  videoUrl        String
+  query           YoutubeMarketQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([queryId, videoId])
+  @@index([queryId, velocityIndex])
+  @@index([videoId])
+  @@index([channelId])
+}
+
+model YoutubeApiUsage {
+  id           String   @id @default(uuid(7))
+  quotaDate    String   @unique
+  searchCalls  Int      @default(0)
+  dataApiUnits Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([quotaDate])
+}

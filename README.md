@@ -124,3 +124,12 @@ bun run db:push
 ```
 
 Run quality checks with `bun run typecheck`, `bun run lint`, and `bun test`.
+
+
+## YouTube SEA market research
+
+AIVISO provides public market discovery through the YouTube Data API v3. Set `YOUTUBE_DATA_API_KEY` in the server environment and restrict the key to the YouTube Data API v3 and trusted server IPs.
+
+Authenticated creators can call `POST /api/youtube/market/search` with a query, SEA market code, date window, sort order, and maximum result count. The service caches results for six hours and enforces a conservative daily quota guard.
+
+This endpoint returns public video/channel statistics and relative sample velocity. It does **not** return keyword search volume, impressions, CTR, watch time, or private channel revenue. Those require separate sources and/or creator-authorized YouTube Analytics access.
