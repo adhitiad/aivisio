@@ -9,7 +9,7 @@ type Asset = {
 }
 type Variant = { id: string; prompt: string; isSelected: boolean; previewUrl: string }
 type Revenue = {
-  channel: { title: string }; current: { views: string; estimatedRevenue: number | null; estimatedAdRevenue: number | null; rpm: number | null; adRpm: number | null; daysWithRevenue: number }
+  channel: { title: string }; startDate: string; endDate: string; current: { views: string; estimatedRevenue: number | null; estimatedAdRevenue: number | null; rpm: number | null; adRpm: number | null; daysWithRevenue: number }
   previous: { views: string; estimatedRevenue: number | null }; revenueChangePct: number | null; adRevenueChangePct: number | null
   daily: Array<{ date: string; views: string; estimatedRevenue: number | null; estimatedAdRevenue: number | null }>; limitations: string[]
 }
