@@ -1,0 +1,309 @@
+// AIVISO — Prisma schema (PostgreSQL + UUIDv7)
+// Aturan repo: semua model punya createdAt/updatedAt; kolom filter/sort diberi index.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// BetterAuth — user / session / account / verification
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String         @id @default(uuid(7))
+  name          String
+  email         String         @unique
+  emailVerified Boolean        @default(false)
+  image         String?
+  provider      String? // legacy: penyedia OAuth pertama kali (google | facebook)
+  sessions      Session[]
+  accounts      Account[]
+  generations   Generation[]
+  videoProjects VideoProject[]
+  youtubeChannels YoutubeChannel[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(uuid(7))
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id @default(uuid(7))
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  youtubeChannels       YoutubeChannel[]
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(uuid(7))
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Model aplikasi
+// ---------------------------------------------------------------------------
+
+model Generation {
+  id        String   @id @default(uuid(7))
+  userId    String?
+  toolId    String
+  title     String
+  inputs    String
+  output    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([toolId])
+  @@index([createdAt])
+}
+
+model VideoProject {
+  id              String   @id @default(uuid(7))
+  userId          String?
+  topic           String
+  format          String // "short" | "long"
+  style           String
+  renderMode      String // "cinematic" | "fast"
+  voice           String // nama voice TTS atau "off"
+  aspect          String   @default("9:16") // 1:1 | 9:16 | 4:3 | 16:9
+  researchEnabled Boolean  @default(false)
+  research        String   @default("[]")
+  targetScenes    Int      @default(0)
+  title           String?
+  description     String?
+  status          String   @default("queued") // queued|planning|building|stitching|done|error
+  stageDetail     String?
+  progress        Int      @default(0)
+  scenesTotal     Int      @default(0)
+  scenesDone      Int      @default(0)
+  durationSec     Int      @default(0)
+  filePath        String?
+  fileBytes       Int      @default(0)
+  scenes          String   @default("[]")
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// YouTube Growth Studio — setiap channel dan data analitik milik satu pengguna.
+// Token OAuth tetap dikelola BetterAuth di Account; model di bawah hanya
+// menyimpan referensi account dan data channel yang diperlukan aplikasi.
+// ---------------------------------------------------------------------------
+
+model YoutubeChannel {
+  id                String                  @id @default(uuid(7))
+  userId            String
+  accountId         String?
+  youtubeChannelId  String                  @unique
+  title             String
+  handle            String?
+  thumbnailUrl      String?
+  description       String?
+  country           String?
+  audience          String?
+  primaryLanguage   String?
+  formats           String                  @default("[]")
+  focusMarkets      String                  @default("[]")
+  weeklyHours       Int?
+  teamSize          String?
+  monthlyBudget     Int?
+  connectionStatus  String                  @default("connected") // connected | needs_reconnect | disconnected
+  lastSyncedAt      DateTime?
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           Account?                @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  goal              YoutubeGoal?
+  metricSnapshots   YoutubeMetricSnapshot[]
+  trendSignals      YoutubeTrendSignal[]
+  contentIdeas      ContentIdea[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([accountId])
+  @@index([connectionStatus])
+}
+
+model YoutubeGoal {
+  id                String         @id @default(uuid(7))
+  channelId         String         @unique
+  targetSubscribers Int            @default(2500)
+  targetViews       BigInt         @default(800000)
+  targetDays        Int            @default(60)
+  startedAt         DateTime       @default(now())
+  channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([startedAt])
+}
+
+model YoutubeMetricSnapshot {
+  id                String         @id @default(uuid(7))
+  channelId         String
+  capturedOn        DateTime
+  subscriberCount   Int            @default(0)
+  totalViews        BigInt         @default(0)
+  publicVideoCount  Int            @default(0)
+  source            String         @default("youtube-data-api")
+  channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([channelId, capturedOn])
+  @@index([channelId, capturedOn])
+}
+
+model YoutubeTrendSignal {
+  id                String         @id @default(uuid(7))
+  channelId         String
+  market            String
+  topic             String
+  videoId           String?
+  videoUrl          String?
+  format            String?
+  publishedAt       DateTime?
+  viewCount         BigInt         @default(0)
+  likeCount         BigInt         @default(0)
+  momentumScore     Int            @default(0)
+  confidence        String         @default("regional-public") // regional-public | channel-analytics
+  source            String         @default("youtube-data-api")
+  capturedAt        DateTime       @default(now())
+  channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([channelId, capturedAt])
+  @@index([market, momentumScore])
+  @@index([videoId])
+}
+
+model ContentIdea {
+  id                String         @id @default(uuid(7))
+  channelId         String
+  title             String
+  angle             String?
+  format            String         @default("long") // short | long
+  status            String         @default("backlog") // backlog | researching | scripting | producing | published | archived
+  plannedFor        DateTime?
+  evidence          String         @default("[]")
+  channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([channelId, status])
+  @@index([channelId, plannedFor])
+  @@index([createdAt])
+}
+
+model AiProvider {
+  id            String    @id @default(uuid(7))
+  key           String    @unique
+  label         String
+  baseUrl       String    @default("")
+  apiKey        String    @default("")
+  model         String    @default("")
+  enabled       Boolean   @default(false)
+  active        Boolean   @default(false)
+  status        String    @default("unknown") // unknown | ok | error
+  statusMessage String?
+  lastCheckedAt DateTime?
+  note          String?
+  sortOrder     Int       @default(100)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([enabled])
+  @@index([sortOrder])
+}
+
+model Notification {
+  id        String   @id @default(uuid(7))
+  userId    String? // null = broadcast ke semua user
+  title     String
+  body      String?
+  type      String   @default("info") // info | success | warning | error
+  read      Boolean  @default(false)
+  link      String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model Setting {
+  id        String   @id @default(uuid(7))
+  key       String   @unique
+  value     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid(7))
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("new") // new | read | archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
