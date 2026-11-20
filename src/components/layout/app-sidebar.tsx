@@ -4,10 +4,12 @@ import { Link } from "@tanstack/react-router";
 import { usePathname } from "@/lib/router";
 import {
   Clapperboard,
+  ChartLine,
   History,
   LayoutDashboard,
   Mail,
   Plug,
+  Search,
   Settings,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -26,6 +28,8 @@ const NAV = [
   { href: "/dashboard", key: "overview", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/history", key: "history", icon: History, exact: false },
   { href: "/dashboard/videos", key: "videos", icon: Clapperboard, exact: false },
+  { href: "/dashboard/research", key: "research", icon: Search, exact: false },
+  { href: "/dashboard/analytics", key: "analytics", icon: ChartLine, exact: false },
   { href: "/dashboard/providers", key: "providers", icon: Plug, exact: false },
   { href: "/dashboard/messages", key: "messages", icon: Mail, exact: false },
   { href: "/dashboard/settings", key: "settings", icon: Settings, exact: false },

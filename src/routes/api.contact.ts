@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
 import { moduleLogger } from '@/lib/logger'
+import { sameOriginGuard } from '@/lib/security/http'
 
 const log = moduleLogger('contact')
 
@@ -18,6 +19,8 @@ export const Route = createFileRoute('/api/contact')({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        const originDenied = sameOriginGuard(request)
+        if (originDenied) return originDenied
         if (!rateLimit(`contact:${clientIp(request)}`, 5, 10 * 60 * 1000)) {
           return Response.json(
             { error: 'Terlalu banyak permintaan. Coba lagi nanti.' },
@@ -27,7 +30,11 @@ export const Route = createFileRoute('/api/contact')({
 
         let body: unknown
         try {
-          body = await request.json()
+          const raw = await request.text()
+          if (new TextEncoder().encode(raw).byteLength > 8_000) {
+            return Response.json({ error: 'Payload terlalu besar.' }, { status: 413 })
+          }
+          body = JSON.parse(raw)
         } catch {
           return Response.json({ error: 'Body tidak valid.' }, { status: 400 })
         }

@@ -42,7 +42,16 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
 }
 
 export function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim().slice(0, 64);
-  return req.headers.get("x-real-ip")?.slice(0, 64) ?? "unknown";
+  // Caddy overwrites X-Real-IP with the actual remote peer address.
+  const realIp = req.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp.slice(0, 64);
+
+  // When running behind a trusted proxy that appends to X-Forwarded-For,
+  // use the final address instead of a potentially client-controlled first item.
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const addresses = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+    return (addresses.at(-1) ?? "unknown").slice(0, 64);
+  }
+  return "unknown";
 }

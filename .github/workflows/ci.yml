@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - adhitiad_gpt
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aiviso
+      BETTER_AUTH_SECRET: ci-only-secret-value-at-least-32-characters
+      PROVIDER_ENCRYPTION_KEY: ci-only-encryption-secret-at-least-32-characters
+      SITE_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Generate Prisma client
+        run: bun run db:generate
+      - name: Type check
+        run: bun run typecheck
+      - name: Lint
+        run: bun run lint
+      - name: Unit tests
+        run: bun test
+      - name: Production build
+        run: bun run build

@@ -15,7 +15,9 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "auth:generate": "bunx @better-auth/cli@latest generate --config src/lib/auth.ts --output prisma/schema.prisma",
-    "auth:migrate": "bunx @better-auth/cli@latest migrate --config src/lib/auth.ts"
+    "auth:migrate": "bunx @better-auth/cli@latest migrate --config src/lib/auth.ts",
+    "test": "bun test",
+    "security:encrypt-provider-keys": "bun run scripts/encrypt-provider-keys.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

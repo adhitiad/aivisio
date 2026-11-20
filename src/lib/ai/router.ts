@@ -2,6 +2,8 @@ import { db } from '@/lib/db'
 import { getZAI } from '@/lib/zai'
 import { getPreset } from './providers'
 import { moduleLogger } from '@/lib/logger'
+import { decryptProviderApiKey } from '@/lib/provider-secrets'
+import { assertSafeProviderBaseUrl } from '@/lib/provider-security'
 
 const log = moduleLogger('ai-router')
 
@@ -24,7 +26,7 @@ async function getActiveProvider(): Promise<ProviderRow> {
     key: row.key,
     label: row.label,
     baseUrl: row.baseUrl,
-    apiKey: row.apiKey,
+    apiKey: decryptProviderApiKey(row.apiKey),
     model: row.model,
     extraHeaderName: preset?.extraHeaderName,
   }
@@ -38,7 +40,8 @@ async function chatViaProvider(provider: ProviderRow, messages: ChatMsg[], timeo
   if (!provider.model) {
     throw new Error(`Nama model untuk "${provider.label}" belum diisi. Buka Pengaturan API AI.`)
   }
-  const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`
+  const safeBaseUrl = await assertSafeProviderBaseUrl(provider.baseUrl, provider.key)
+  const url = `${safeBaseUrl.replace(/\/+$/, '')}/chat/completions`
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -53,6 +56,7 @@ async function chatViaProvider(provider: ProviderRow, messages: ChatMsg[], timeo
     headers,
     body: JSON.stringify({ model: provider.model, messages, stream: false }),
     signal: AbortSignal.timeout(timeoutMs),
+    redirect: 'error',
   })
   if (!res.ok) {
     const body = (await res.text().catch(() => '')).slice(0, 300)
