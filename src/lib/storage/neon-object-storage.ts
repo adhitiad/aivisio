@@ -157,6 +157,8 @@ export async function putBuffer(key: string, body: Buffer, contentType: string):
   const config = getConfig()
   const sha256 = createHash('sha256').update(body).digest('hex')
   const signed = signRequest(config, 'PUT', key, sha256, sha256)
+  const payload = new Uint8Array(body.byteLength)
+  payload.set(body)
   const response = await fetch(signed.url, {
     method: 'PUT',
     headers: {
@@ -164,7 +166,7 @@ export async function putBuffer(key: string, body: Buffer, contentType: string):
       'Content-Type': contentType,
       'Content-Length': String(body.byteLength),
     },
-    body,
+    body: payload,
     signal: timeoutSignal(),
   })
   await assertOk(response, 'PUT')

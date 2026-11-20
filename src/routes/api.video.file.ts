@@ -99,7 +99,7 @@ export const Route = createFileRoute('/api/video/file')({
           const object = await getObject(project.fileObjectKey, range ? 'bytes=' + range.start + '-' + range.end : undefined)
           if (!object) return new Response('File video tidak ditemukan.', { status: 404 })
           const contentLength = range ? range.end - range.start + 1 : head.size
-          const responseHeaders = { ...headers, 'Content-Length': String(contentLength) }
+          const responseHeaders: Record<string, string> = { ...headers, 'Content-Length': String(contentLength) }
           if (range) responseHeaders['Content-Range'] = 'bytes ' + range.start + '-' + range.end + '/' + head.size
           return new Response(object.body, { status: range ? 206 : 200, headers: responseHeaders })
         }
