@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
-import { RefreshCw, UploadCloud, Clapperboard, CheckCircle2, Clock3, AlertCircle, RotateCcw, XCircle, ExternalLink } from "lucide-react"
+import { RefreshCw, UploadCloud, Clapperboard, CheckCircle2, Clock3, AlertCircle, RotateCcw, XCircle, ExternalLink, Activity, Server, BellRing, Timer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +21,14 @@ type Publication = {
   channel: { title: string }; videoProject: { topic: string; fileBytes: number };
 }
 type Payload = { items: Publication[]; channels: Channel[]; projects: Project[] }
+type Operations = {
+  observedAt: string
+  status: "ok" | "running" | "degraded" | "unknown"
+  queue: Record<string, number>
+  worker: { staleUploads: number; overdueJobs: number; heartbeatAgeSeconds: number | null; lastRun: { runId: string; status: string; startedAt: string; completedAt?: string; durationMs?: number; eligible?: number; attempted?: number } | null }
+  alerts: Array<{ id: string; severity: "critical" | "warning"; title: string; detail: string }>
+  recentActivity: Array<{ id: string; title: string; channel: string; status: string; attempts: number; maxAttempts: number; lastError: string | null; updatedAt: string; nextAttemptAt: string }>
+}
 
 const STATUS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending_approval: { label: "Menunggu persetujuan", variant: "outline" },
@@ -53,6 +61,8 @@ export function YoutubePublishingDashboard() {
   const { toast } = useToast()
   const [data, setData] = useState<Payload>({ items: [], channels: [], projects: [] })
   const [loading, setLoading] = useState(true)
+  const [operations, setOperations] = useState<Operations | null>(null)
+  const [operationsError, setOperationsError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [preflightBusy, setPreflightBusy] = useState(false)
@@ -72,7 +82,13 @@ export function YoutubePublishingDashboard() {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Gagal memuat publikasi.")
       setData(payload as Payload)
+      const opsResponse = await fetch("/api/youtube/publish/operations", { cache: "no-store" })
+      const opsPayload = await opsResponse.json()
+      if (!opsResponse.ok) throw new Error(opsPayload.error || "Gagal memuat operational dashboard.")
+      setOperations(opsPayload as Operations)
+      setOperationsError(null)
     } catch (error) {
+      setOperationsError(error instanceof Error ? error.message : "Data operasional tidak tersedia.")
       if (!silent) toast({ title: error instanceof Error ? error.message : "Gagal memuat publikasi.", variant: "destructive" })
     } finally {
       if (!silent) setLoading(false)
@@ -179,6 +195,54 @@ export function YoutubePublishingDashboard() {
           <item.icon className="h-5 w-5 text-muted-foreground" />
         </CardContent></Card>)}
       </div>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div><div className="flex items-center gap-2 text-sm text-muted-foreground"><Activity className="h-4 w-4" /> Operational monitoring</div><h2 className="text-lg font-semibold">Worker health & alerting</h2></div>
+          <span className="text-xs text-muted-foreground">{operations ? "Diperbarui " + formatDate(operations.observedAt) : "Menunggu data operasional"}</span>
+        </div>
+        {operationsError && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{operationsError}</div>}
+        {!operations && !operationsError && <div className="rounded-lg border p-5 text-sm text-muted-foreground">Memuat status worker...</div>}
+        {operations && <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            {[
+              { label: "Menunggu approval", value: operations.queue.pending_approval ?? 0 },
+              { label: "Terjadwal", value: operations.queue.scheduled ?? 0 },
+              { label: "Sedang upload", value: operations.queue.uploading ?? 0 },
+              { label: "Berhasil", value: operations.queue.published ?? 0 },
+              { label: "Gagal", value: operations.queue.failed ?? 0 },
+            ].map(metric => <Card key={metric.label}><CardContent className="p-3"><p className="text-xs text-muted-foreground">{metric.label}</p><p className="mt-1 text-2xl font-semibold tabular-nums">{metric.value}</p></CardContent></Card>)}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Server className="h-4 w-4" /> Kondisi scheduler</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Health</span><Badge variant={operations.status === "ok" ? "default" : operations.status === "running" ? "secondary" : "destructive"}>{operations.status.toUpperCase()}</Badge></div>
+                <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Heartbeat</span><span className="tabular-nums">{operations.worker.heartbeatAgeSeconds === null ? "Belum ada" : operations.worker.heartbeatAgeSeconds + " detik lalu"}</span></div>
+                <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Lease stale</span><span className="font-medium tabular-nums">{operations.worker.staleUploads}</span></div>
+                <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Antrean terlambat</span><span className="font-medium tabular-nums">{operations.worker.overdueJobs}</span></div>
+                {operations.worker.lastRun && <div className="border-t pt-3 text-xs text-muted-foreground">
+                  <p>Eksekusi terakhir: {formatDate(operations.worker.lastRun.completedAt || operations.worker.lastRun.startedAt)}</p>
+                  <p className="mt-1">Run {operations.worker.lastRun.runId.slice(0, 8)} · {operations.worker.lastRun.status} · {operations.worker.lastRun.durationMs == null ? "durasi belum tersedia" : (operations.worker.lastRun.durationMs / 1000).toFixed(1) + " detik"}</p>
+                  <p className="mt-1">Diproses: {operations.worker.lastRun.attempted ?? 0}/{operations.worker.lastRun.eligible ?? 0}</p>
+                </div>}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4" /> Peringatan operasional <Badge variant="outline">{operations.alerts.length}</Badge></CardTitle><CardDescription>Alert berdasarkan kondisi antrean dan heartbeat.</CardDescription></CardHeader>
+              <CardContent className="space-y-2">
+                {operations.alerts.length === 0 ? <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />Tidak ada alert aktif.</div> : operations.alerts.map(alert => <div key={alert.id} role="status" className={alert.severity === "critical" ? "rounded-md border border-destructive/30 bg-destructive/5 p-3" : "rounded-md border border-amber-500/30 bg-amber-500/5 p-3"}><div className="flex items-center gap-2 text-sm font-medium"><AlertCircle className="h-4 w-4" />{alert.title}</div><p className="mt-1 text-xs text-muted-foreground">{alert.detail}</p></div>)}
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Timer className="h-4 w-4" /> Aktivitas yang perlu dipantau</CardTitle><CardDescription>Publikasi gagal, upload aktif, dan antrean terjadwal milik akun ini.</CardDescription></CardHeader>
+            <CardContent>
+              {operations.recentActivity.length === 0 ? <p className="py-3 text-sm text-muted-foreground">Belum ada aktivitas yang memerlukan pemantauan.</p> : <div className="space-y-3">{operations.recentActivity.map(item => <div key={item.id} className="flex flex-col gap-1 border-b pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.title}</p><p className="text-xs text-muted-foreground">{item.channel} · {formatDate(item.updatedAt)}</p>{item.lastError && <p className="mt-1 line-clamp-2 text-xs text-destructive">{item.lastError}</p>}</div><div className="flex shrink-0 items-center gap-2"><Badge variant={item.status === "failed" ? "destructive" : "secondary"}>{STATUS[item.status]?.label ?? item.status}</Badge><span className="text-xs tabular-nums text-muted-foreground">{item.attempts}/{item.maxAttempts}</span></div></div>)}</div>}
+            </CardContent>
+          </Card>
+        </>}
+      </section>
 
       <Card>
         <CardHeader>

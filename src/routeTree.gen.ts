@@ -60,6 +60,7 @@ import { Route as ApiYoutubeStrategySnapshotRouteImport } from './routes/api.you
 import { Route as ApiYoutubeRevenueRouteImport } from './routes/api.youtube.revenue'
 import { Route as ApiYoutubePublishRouteImport } from './routes/api.youtube.publish'
 import { Route as ApiYoutubePublishSchedulerRouteImport } from './routes/api.youtube.publish.scheduler'
+import { Route as ApiYoutubePublishOperationsRouteImport } from './routes/api.youtube.publish.operations'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -272,6 +273,7 @@ const ApiYoutubeStrategySnapshotRoute = ApiYoutubeStrategySnapshotRouteImport.up
 const ApiYoutubeRevenueRoute = ApiYoutubeRevenueRouteImport.update({ id: '/youtube/revenue', path: '/youtube/revenue', getParentRoute: () => ApiRoute } as any)
 const ApiYoutubePublishRoute = ApiYoutubePublishRouteImport.update({ id: '/youtube/publish', path: '/youtube/publish', getParentRoute: () => ApiRoute } as any)
 const ApiYoutubePublishSchedulerRoute = ApiYoutubePublishSchedulerRouteImport.update({ id: '/youtube/publish/scheduler', path: '/youtube/publish/scheduler', getParentRoute: () => ApiRoute } as any)
+const ApiYoutubePublishOperationsRoute = ApiYoutubePublishOperationsRouteImport.update({ id: '/youtube/publish/operations', path: '/youtube/publish/operations', getParentRoute: () => ApiRoute } as any)
 const ApiAiProvidersTestRoute = ApiAiProvidersTestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -1081,6 +1083,7 @@ interface ApiRouteChildren {
   ApiYoutubeRevenueRoute: typeof ApiYoutubeRevenueRoute
   ApiYoutubePublishRoute: typeof ApiYoutubePublishRoute
   ApiYoutubePublishSchedulerRoute: typeof ApiYoutubePublishSchedulerRoute
+  ApiYoutubePublishOperationsRoute: typeof ApiYoutubePublishOperationsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -1109,6 +1112,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiYoutubeRevenueRoute: ApiYoutubeRevenueRoute,
   ApiYoutubePublishRoute: ApiYoutubePublishRoute,
   ApiYoutubePublishSchedulerRoute: ApiYoutubePublishSchedulerRoute,
+  ApiYoutubePublishOperationsRoute: ApiYoutubePublishOperationsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 
