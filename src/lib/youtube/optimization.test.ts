@@ -3,17 +3,16 @@ import { buildRevenueRecommendations, calculateRevenueForecast, calculateYppProg
 
 describe('YouTube optimization calculations', () => {
   test('does not invent YPP thresholds when manual Studio values are missing', () => {
-    expect(calculateYppProgress({
+    const result = calculateYppProgress({
       validPublicWatchHours: null,
       requiredPublicWatchHours: null,
       validShortsViews: 10_000,
       requiredShortsViews: null,
-    })).toEqual({
-      watchHoursProgress: null,
-      shortsViewsProgress: null,
-      hasManualThresholds: false,
-      checked: true,
     })
+    expect(result.watchHoursProgress).toBe(null)
+    expect(result.shortsViewsProgress).toBe(null)
+    expect(result.hasManualThresholds).toBe(false)
+    expect(result.checked).toBe(true)
   })
 
   test('calculates progress using supplied thresholds only', () => {
@@ -24,7 +23,7 @@ describe('YouTube optimization calculations', () => {
       requiredShortsViews: 3_000_000,
     })
     expect(result.watchHoursProgress).toBe(50)
-    expect(result.shortsViewsProgress).toBeCloseTo(66.6667, 3)
+    expect(result.shortsViewsProgress).toBe(2_000_000 / 3_000_000 * 100)
   })
 
   test('calculates an explicit what-if revenue range', () => {
@@ -42,12 +41,25 @@ describe('YouTube optimization calculations', () => {
   })
 
   test('rejects invalid assumptions instead of returning misleading projections', () => {
-    expect(() => calculateRevenueForecast({
-      targetRevenue: 0, rpm: 10_000, baselineDailyViews: 100, projectionDays: 30,
-    })).toThrow()
-    expect(() => calculateRevenueForecast({
-      targetRevenue: 1_000_000, rpm: 10_000, baselineDailyViews: 100, projectionDays: 0,
-    })).toThrow()
+    let invalidTargetRejected = false
+    try {
+      calculateRevenueForecast({
+        targetRevenue: 0, rpm: 10_000, baselineDailyViews: 100, projectionDays: 30,
+      })
+    } catch {
+      invalidTargetRejected = true
+    }
+    expect(invalidTargetRejected).toBe(true)
+
+    let invalidWindowRejected = false
+    try {
+      calculateRevenueForecast({
+        targetRevenue: 1_000_000, rpm: 10_000, baselineDailyViews: 100, projectionDays: 0,
+      })
+    } catch {
+      invalidWindowRejected = true
+    }
+    expect(invalidWindowRejected).toBe(true)
   })
 
   test('recommendations do not label forecasts or missing metrics as actual revenue', () => {
@@ -57,6 +69,6 @@ describe('YouTube optimization calculations', () => {
       averageViewPercentage: null,
       rpm: null,
     })
-    expect(recommendations[0]).toContain('belum tersedia sebagai metrik aktual')
+    expect(recommendations[0].includes('belum tersedia sebagai metrik aktual')).toBe(true)
   })
 })
