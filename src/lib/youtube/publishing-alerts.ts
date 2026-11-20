@@ -37,9 +37,10 @@ export async function syncYoutubePublishingAlerts(now = new Date()) {
       db.youtubePublication.count({
         where: { userId: user.id, status: 'scheduled', approvedAt: { not: null }, nextAttemptAt: { lt: staleBefore } },
       }),
-      db.youtubePublication.count({
-        where: { userId: user.id, status: 'failed', uploadAttempts: { gte: 1 }, },
-      }),
+      db.youtubePublication.findMany({
+        where: { userId: user.id, status: 'failed' },
+        select: { uploadAttempts: true, maxUploadAttempts: true },
+      }).then(items => items.filter(item => item.uploadAttempts >= item.maxUploadAttempts).length),
     ])
     const health = getYoutubeWorkerHealthStatus({
       staleUploads,
