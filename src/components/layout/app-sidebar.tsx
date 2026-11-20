@@ -13,7 +13,6 @@ import {
   Settings,
   Target,
   TrendingUp,
-  Clapperboard,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import {
