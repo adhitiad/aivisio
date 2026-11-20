@@ -317,11 +317,17 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
   '/dashboard/research': typeof ProtectedDashboardResearchRoute
+  '/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
   '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
+  '/api/youtube/oauth/connect': typeof ApiYoutubeOauthConnectRoute
+  '/api/youtube/oauth/callback': typeof ApiYoutubeOauthCallbackRoute
+  '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
+  '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
+  '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -353,11 +359,17 @@ export interface FileRoutesById {
   '/_protected/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/_protected/dashboard/videos': typeof ProtectedDashboardVideosRoute
   '/_protected/dashboard/research': typeof ProtectedDashboardResearchRoute
+  '/_protected/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
   '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
+  '/api/youtube/oauth/connect': typeof ApiYoutubeOauthConnectRoute
+  '/api/youtube/oauth/callback': typeof ApiYoutubeOauthCallbackRoute
+  '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
+  '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
+  '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -429,11 +441,17 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/dashboard/videos'
     | '/dashboard/research'
+    | '/dashboard/analytics'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
     | '/api/youtube/market/search'
+    | '/api/youtube/oauth/connect'
+    | '/api/youtube/oauth/callback'
+    | '/api/youtube/channels'
+    | '/api/youtube/analytics'
+    | '/api/youtube/disconnect'
   id:
     | '__root__'
     | '/'
@@ -470,6 +488,11 @@ export interface FileRouteTypes {
     | '/api/notifications/$id'
     | '/api/video/file'
     | '/api/youtube/market/search'
+    | '/api/youtube/oauth/connect'
+    | '/api/youtube/oauth/callback'
+    | '/api/youtube/channels'
+    | '/api/youtube/analytics'
+    | '/api/youtube/disconnect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
