@@ -3,6 +3,7 @@ import { hostname } from 'node:os'
 import { db } from '../src/lib/db'
 import { moduleLogger } from '../src/lib/logger'
 import { runVideoPipeline } from '../src/lib/video/pipeline'
+import { retryDelayMs } from '../src/lib/video/worker-utils'
 
 const log = moduleLogger('video-worker')
 const workerId = (process.env.HOSTNAME || hostname()) + '-' + process.pid + '-' + randomUUID().slice(0, 8)
@@ -75,7 +76,7 @@ async function processJob(job: { id: string; videoProjectId: string; attempt: nu
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown video worker error'
     const retry = job.attempt < job.maxAttempts
-    const backoff = Math.min(30 * 60_000, 60_000 * (2 ** Math.max(0, job.attempt - 1)))
+    const backoff = retryDelayMs(job.attempt)
     await db.videoJob.updateMany({
       where: { id: job.id, status: 'processing', lockedBy: workerId },
       data: { status: retry ? 'queued' : 'failed', availableAt: new Date(Date.now() + (retry ? backoff : 0)), lockedAt: null, heartbeatAt: null, lockedBy: null, lastError: message },
