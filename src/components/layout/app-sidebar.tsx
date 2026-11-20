@@ -5,6 +5,7 @@ import { usePathname } from "@/lib/router";
 import {
   Clapperboard,
   ChartLine,
+  Clapperboard,
   History,
   LayoutDashboard,
   Mail,
@@ -30,6 +31,7 @@ const NAV = [
   { href: "/dashboard/videos", key: "videos", icon: Clapperboard, exact: false },
   { href: "/dashboard/research", key: "research", icon: Search, exact: false },
   { href: "/dashboard/analytics", key: "analytics", icon: ChartLine, exact: false },
+  { href: "/dashboard/studio", key: "creatorStudioNav", icon: Clapperboard, exact: false },
   { href: "/dashboard/providers", key: "providers", icon: Plug, exact: false },
   { href: "/dashboard/messages", key: "messages", icon: Mail, exact: false },
   { href: "/dashboard/settings", key: "settings", icon: Settings, exact: false },
