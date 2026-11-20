@@ -1,12 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import {
-  isJobRunning,
-  removeMediaDir,
-  startVideoJob,
-  type SceneState,
-} from '@/lib/video/pipeline'
+import { removeMediaDir, type SceneState } from '@/lib/video/pipeline'
 import {
   AGENT_COUNT,
   DEFAULT_ASPECT,
@@ -126,28 +121,30 @@ export const Route = createFileRoute('/api/video')({
             )
           }
 
-          const created = await db.videoProject.create({
-            data: {
-              userId: session.user.id,
-              topic: input.topic,
-              format,
-              style: styleId,
-              renderMode,
-              voice,
-              aspect,
-              researchEnabled,
-              targetScenes,
-              status: 'queued',
-              stageDetail: 'Antre...',
-            },
+          const created = await db.$transaction(async (tx) => {
+            const project = await tx.videoProject.create({
+              data: {
+                userId: session.user.id,
+                topic: input.topic,
+                format,
+                style: styleId,
+                renderMode,
+                voice,
+                aspect,
+                researchEnabled,
+                targetScenes,
+                status: 'queued',
+                stageDetail: 'Menunggu worker video...',
+              },
+            })
+            await tx.videoJob.create({ data: { videoProjectId: project.id } })
+            return project
           })
-
-          startVideoJob(created.id)
           log.info(
             { id: created.id, userId: session.user.id, format, aspect, renderMode, researchEnabled },
             'project video dibuat',
           )
-          return Response.json({ id: created.id, status: created.status })
+          return Response.json({ id: created.id, status: created.status, queue: 'queued' }, { status: 202 })
         } catch (err) {
           log.error(
             { err: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
@@ -189,26 +186,16 @@ export const Route = createFileRoute('/api/video')({
             return Response.json({ list }, { headers: { 'Cache-Control': 'private, no-store' } })
           }
 
-          let project = await db.videoProject.findFirst({
+          const project = await db.videoProject.findFirst({
             where: { id, userId: session.user.id },
           })
           if (!project) {
             return Response.json({ error: 'Project video tidak ditemukan.' }, { status: 404 })
           }
-
-          const activeStatus = ['queued', 'planning', 'building', 'stitching']
-          if (activeStatus.includes(project.status) && !isJobRunning(project.id)) {
-            const age = Date.now() - new Date(project.updatedAt).getTime()
-            if (age > 90_000) {
-              project = await db.videoProject.update({
-                where: { id: project.id },
-                data: {
-                  status: 'error',
-                  error: 'Proses terhenti (server dimuat ulang). Silakan buat ulang video.',
-                },
-              })
-            }
-          }
+          const queueJob = await db.videoJob.findUnique({
+            where: { videoProjectId: project.id },
+            select: { status: true, attempts: true, maxAttempts: true, availableAt: true, heartbeatAt: true, lastError: true },
+          })
 
           let scenes: SceneState[] = []
           try {
@@ -239,6 +226,14 @@ export const Route = createFileRoute('/api/video')({
                 durationSec: project.durationSec,
                 fileBytes: project.fileBytes,
                 error: project.error,
+                queue: queueJob ? {
+                  status: queueJob.status,
+                  attempts: queueJob.attempts,
+                  maxAttempts: queueJob.maxAttempts,
+                  availableAt: queueJob.availableAt,
+                  heartbeatAt: queueJob.heartbeatAt,
+                  lastError: queueJob.lastError,
+                } : null,
                 createdAt: project.createdAt,
                 updatedAt: project.updatedAt,
                 scenes,
@@ -275,11 +270,9 @@ export const Route = createFileRoute('/api/video')({
           if (!id || id.length > 80) {
             return Response.json({ error: 'Parameter id tidak valid.' }, { status: 400 })
           }
-          if (isJobRunning(id)) {
-            return Response.json(
-              { error: 'Video sedang diproses, tunggu sampai selesai.' },
-              { status: 409 },
-            )
+          const queueJob = await db.videoJob.findUnique({ where: { videoProjectId: id }, select: { status: true } })
+          if (queueJob?.status === 'processing') {
+            return Response.json({ error: 'Video sedang diproses worker. Tunggu sampai selesai.' }, { status: 409 })
           }
           const project = await db.videoProject.findFirst({
             where: { id, userId: session.user.id },
