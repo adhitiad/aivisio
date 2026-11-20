@@ -48,7 +48,7 @@ export const Route = createFileRoute('/api/youtube/publish/operations')({
             },
           }),
           db.setting.findUnique({ where: { key: HEARTBEAT_KEY }, select: { value: true } }),
-          db.youtubeWorkerRun.findMany({ orderBy: { startedAt: 'desc' }, take: 20, select: { runId: true, status: true, startedAt: true, completedAt: true, durationMs: true, eligible: true, attempted: true, error: true } }),
+          db.youtubeWorkerRun.findMany({ orderBy: { startedAt: 'desc' }, take: 20, select: { runId: true, status: true, startedAt: true, completedAt: true, durationMs: true, eligible: true, attempted: true } }),
           db.youtubePublishingAlert.findMany({ where: { userId: session.user.id, status: 'active' }, orderBy: { lastSeenAt: 'desc' }, take: 20, select: { id: true, severity: true, title: true, detail: true, firstSeenAt: true, lastSeenAt: true, notificationId: true } }),
         ])
 
@@ -97,7 +97,7 @@ export const Route = createFileRoute('/api/youtube/publish/operations')({
             lastRun,
           },
           alerts: persistentAlerts,
-          executionHistory: runs.map(run => ({ ...run, startedAt: run.startedAt.toISOString(), completedAt: run.completedAt?.toISOString() ?? null })),
+          executionHistory: runs.map(run => ({ ...run, error: run.status === 'error' ? 'Scheduler gagal; periksa log server untuk detail.' : null, startedAt: run.startedAt.toISOString(), completedAt: run.completedAt?.toISOString() ?? null })),
           recentActivity: recent.map(item => ({
             id: item.id,
             title: item.title,

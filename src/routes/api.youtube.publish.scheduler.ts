@@ -98,6 +98,9 @@ export const Route = createFileRoute('/api/youtube/publish/scheduler')({
       GET: async ({ request }: { request: Request }) => {
         if (!authorized(request)) return Response.json({ error: 'Unauthorized scheduler request.' }, { status: 401 })
         try {
+          // External uptime monitors can call this endpoint to persist stale-heartbeat alerts
+          // even when the scheduled POST worker has stopped running.
+          await syncYoutubePublishingAlerts()
           const metrics = await getObservability()
           return Response.json(metrics, {
             status: metrics.status === 'ok' || metrics.status === 'running' ? 200 : 503,

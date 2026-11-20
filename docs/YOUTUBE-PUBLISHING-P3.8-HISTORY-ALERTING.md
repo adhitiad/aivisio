@@ -26,5 +26,5 @@ Run `bun run db:generate` and apply the additive schema changes using the reposi
 
 - A scheduler run is created before work begins; a process killed before finalization can leave a `running` record. Monitoring should treat old running records as interrupted invocations.
 - Notification idempotency is enforced by a unique dedupe key per alert activation.
-- Alert evaluation runs after scheduler invocations, not as a separate always-on monitor. If the scheduler stops entirely, existing users will not receive a newly generated stale-heartbeat notification until another scheduler invocation or an external monitor calls the health endpoint.
+- Alert evaluation runs after scheduler invocations and whenever the protected scheduler GET health endpoint is polled. Configure an external uptime monitor to call the protected GET endpoint on a cadence (for example every 5 minutes); it can then detect stale heartbeat and persist in-app alerts even if the scheduled POST worker has stopped.
 - No external email, SMS, push provider or webhook delivery is configured in this milestone.
