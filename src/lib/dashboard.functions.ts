@@ -15,14 +15,17 @@ async function requireAdmin(): Promise<void> {
 
 export const getDashboardStatsFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    await requireAdmin()
+    const principal = await requirePrincipal()
+    const isAdmin = principal.role === 'OWNER' || principal.role === 'ADMIN'
+    const userScope = isAdmin ? {} : { userId: principal.userId }
     const [generations, videos, activeProviders, newMessages, recent] =
       await Promise.all([
-        db.generation.count(),
-        db.videoProject.count(),
-        db.aiProvider.count({ where: { active: true } }),
-        db.contactMessage.count({ where: { status: 'new' } }),
+        db.generation.count({ where: userScope }),
+        db.videoProject.count({ where: userScope }),
+        isAdmin ? db.aiProvider.count({ where: { active: true } }) : Promise.resolve(0),
+        isAdmin ? db.contactMessage.count({ where: { status: 'new' } }) : Promise.resolve(0),
         db.generation.findMany({
+          where: userScope,
           orderBy: { createdAt: 'desc' },
           take: 5,
           select: { id: true, toolId: true, title: true, createdAt: true },

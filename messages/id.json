@@ -142,7 +142,58 @@
     },
     "deleteConfirm": "Yakin ingin menghapus? Tindakan ini tidak dapat dibatalkan.",
     "deleted": "Data dihapus.",
-    "deleteFailed": "Gagal menghapus data."
+    "deleteFailed": "Gagal menghapus data.",
+    "research": "Riset Pasar YouTube",
+    "marketResearch": {
+      "title": "Riset Pasar YouTube Asia Tenggara",
+      "subtitle": "Cari video publik berdasarkan negara, bahasa, niche, dan periode. Data ini adalah hasil discovery YouTube, bukan volume pencarian keyword.",
+      "queryLabel": "Niche atau kata kunci",
+      "queryPlaceholder": "mis. review HP murah, resep masakan, edukasi finansial",
+      "marketLabel": "Pasar",
+      "orderLabel": "Urutkan",
+      "periodLabel": "Periode publikasi",
+      "resultsLabel": "Jumlah hasil",
+      "search": "Cari peluang",
+      "searching": "Mengambil data YouTube...",
+      "cache": "Hasil cache",
+      "live": "Data baru",
+      "observed": "Diamati",
+      "views": "Views",
+      "likes": "Likes",
+      "comments": "Komentar",
+      "viewsPerDay": "Views/hari sejak terbit",
+      "velocity": "Indeks relatif dalam sampel",
+      "engagement": "Engagement publik",
+      "published": "Terbit",
+      "source": "Sumber",
+      "limitations": "Batasan data",
+      "noResults": "Tidak ada video yang dikembalikan untuk query ini.",
+      "notConfigured": "YOUTUBE_DATA_API_KEY belum dikonfigurasi di server.",
+      "error": "Riset gagal diproses.",
+      "markets": {
+        "ID": "Indonesia",
+        "MY": "Malaysia",
+        "SG": "Singapura",
+        "PH": "Filipina",
+        "TH": "Thailand",
+        "VN": "Vietnam",
+        "BN": "Brunei",
+        "KH": "Kamboja",
+        "LA": "Laos",
+        "MM": "Myanmar"
+      },
+      "orders": {
+        "relevance": "Paling relevan",
+        "date": "Terbaru",
+        "viewCount": "Views terbanyak"
+      },
+      "periods": {
+        "7": "7 hari",
+        "30": "30 hari",
+        "90": "90 hari",
+        "365": "1 tahun"
+      }
+    }
   },
   "studio": {
     "titleA": "5 Tool AI.",

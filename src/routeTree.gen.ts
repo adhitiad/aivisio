@@ -36,6 +36,7 @@ import { Route as ProtectedDashboardMessagesRouteImport } from './routes/_protec
 import { Route as ProtectedDashboardProvidersRouteImport } from './routes/_protected.dashboard.providers'
 import { Route as ProtectedDashboardSettingsRouteImport } from './routes/_protected.dashboard.settings'
 import { Route as ProtectedDashboardVideosRouteImport } from './routes/_protected.dashboard.videos'
+import { Route as ProtectedDashboardResearchRouteImport } from './routes/_protected.dashboard.research'
 import { Route as ApiAiProvidersTestRouteImport } from './routes/api.ai-providers.test'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as ApiNotificationsIdRouteImport } from './routes/api.notifications.$id'
@@ -186,6 +187,11 @@ const ProtectedDashboardVideosRoute =
     path: '/videos',
     getParentRoute: () => ProtectedDashboardRoute,
   } as any)
+const ProtectedDashboardResearchRoute = ProtectedDashboardResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => ProtectedDashboardRoute,
+} as any)
 const ApiAiProvidersTestRoute = ApiAiProvidersTestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -234,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/_protected/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/_protected/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/_protected/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/_protected/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/settings'
     | '/dashboard/videos'
+    | '/dashboard/research'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/settings'
     | '/dashboard/videos'
+    | '/dashboard/research'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -404,6 +415,7 @@ export interface FileRouteTypes {
     | '/_protected/dashboard/providers'
     | '/_protected/dashboard/settings'
     | '/_protected/dashboard/videos'
+    | '/_protected/dashboard/research'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -616,6 +628,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedDashboardVideosRouteImport
       parentRoute: typeof ProtectedDashboardRoute
     }
+    '/_protected/dashboard/research': {
+      id: '/_protected/dashboard/research'
+      path: '/research'
+      fullPath: '/dashboard/research'
+      preLoaderRoute: typeof ProtectedDashboardResearchRouteImport
+      parentRoute: typeof ProtectedDashboardRoute
+    }
     '/api/ai-providers/test': {
       id: '/api/ai-providers/test'
       path: '/test'
@@ -660,6 +679,7 @@ interface ProtectedDashboardRouteChildren {
   ProtectedDashboardProvidersRoute: typeof ProtectedDashboardProvidersRoute
   ProtectedDashboardSettingsRoute: typeof ProtectedDashboardSettingsRoute
   ProtectedDashboardVideosRoute: typeof ProtectedDashboardVideosRoute
+  ProtectedDashboardResearchRoute: typeof ProtectedDashboardResearchRoute
 }
 
 const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
@@ -668,6 +688,7 @@ const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
   ProtectedDashboardProvidersRoute: ProtectedDashboardProvidersRoute,
   ProtectedDashboardSettingsRoute: ProtectedDashboardSettingsRoute,
   ProtectedDashboardVideosRoute: ProtectedDashboardVideosRoute,
+  ProtectedDashboardResearchRoute: ProtectedDashboardResearchRoute,
 }
 
 const ProtectedDashboardRouteWithChildren =
