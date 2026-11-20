@@ -964,6 +964,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoutubePublishSchedulerRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/youtube/publish/operations': {
+      id: '/api/youtube/publish/operations'
+      path: '/youtube/publish/operations'
+      fullPath: '/api/youtube/publish/operations'
+      preLoaderRoute: typeof ApiYoutubePublishOperationsRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/studio': {
       id: '/api/studio'
       path: '/studio'
