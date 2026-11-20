@@ -53,3 +53,10 @@ Tanggal laporan menggunakan rentang maksimum 365 hari. YouTube dapat mengembalik
 Halaman dashboard: `/dashboard/analytics`.
 
 Data metrik harian yang sudah disinkronkan tetap tersimpan setelah disconnect agar riwayat channel tidak hilang. Token Google dan relasi koneksi aktif dihapus; pengguna dapat meminta penghapusan data historis melalui prosedur penghapusan akun/data aplikasi.
+
+
+## Automated private Analytics sync
+
+The scheduled worker calls `GET /api/youtube/scheduler` with `Authorization: Bearer YOUTUBE_CRON_SECRET`. It performs a 365-day initial backfill for each eligible connected channel, then refreshes a 14-day overlap daily so late YouTube Analytics revisions are captured. The worker intentionally ends two Pacific calendar days behind the current date because recent daily reports may not be complete.
+
+Set `YOUTUBE_CRON_SECRET` to a random 32+ character secret on the application server. Configure the GitHub repository variable `AIVISO_BASE_URL` and secret `YOUTUBE_CRON_SECRET` to enable `.github/workflows/youtube-scheduled-sync.yml`. The scheduled workflow runs every six hours; channel Analytics is throttled to at most once every 20 hours. The workflow must be present on the repository's default branch before GitHub scheduled events run.

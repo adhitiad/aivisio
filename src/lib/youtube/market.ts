@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { db } from '@/lib/db'
+import { deriveObservedMomentum, scoreYoutubeOpportunity } from './scoring'
 
 export const MARKET_CODES = ['ID', 'MY', 'SG', 'PH', 'TH', 'VN', 'BN', 'KH', 'LA', 'MM'] as const
 export type MarketCode = (typeof MARKET_CODES)[number]
@@ -100,6 +101,17 @@ type StoredVideo = {
   videoUrl: string
 }
 
+type ScoredStoredVideo = StoredVideo & {
+  momentumViewsPerDay: number | null
+  momentumGrowthPct: number | null
+  momentumSampleHours: number | null
+  opportunityScore: number
+  scoringConfidence: 'high' | 'medium' | 'limited'
+  scoringComponents: string
+  opportunityRationale: string
+  momentumObservationCount: number
+}
+
 const globalForMarket = globalThis as unknown as {
   aivisoMarketInFlight?: Map<string, Promise<YoutubeMarketSearchResult>>
 }
@@ -132,6 +144,14 @@ export type YoutubeMarketSearchResult = {
     viewsPerDay: number
     engagementRate: number
     velocityIndex: number
+    momentumViewsPerDay: number | null
+    momentumGrowthPct: number | null
+    momentumSampleHours: number | null
+    opportunityScore: number
+    scoringConfidence: 'high' | 'medium' | 'limited'
+    scoringComponents: Record<string, { score: number; available: boolean; weight: number; rationale: string }>
+    opportunityRationale: string[]
+    momentumObservationCount: number
     thumbnailUrl: string | null
     videoUrl: string
   }>
@@ -277,6 +297,26 @@ async function youtubeApiGet<T>(resource: string, params: Record<string, string>
   return (payload ?? {}) as T
 }
 
+function parseJsonRecord(value: string): Record<string, { score: number; available: boolean; weight: number; rationale: string }> {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, { score: number; available: boolean; weight: number; rationale: string }>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function parseJsonStringArray(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 function serializeCached(
   query: {
     id: string
@@ -301,6 +341,14 @@ function serializeCached(
       viewsPerDay: number
       engagementRate: number
       velocityIndex: number
+      momentumViewsPerDay: number | null
+      momentumGrowthPct: number | null
+      momentumSampleHours: number | null
+      opportunityScore: number
+      scoringConfidence: string | null
+      scoringComponents: string
+      opportunityRationale: string
+      momentumObservationCount: number
       thumbnailUrl: string | null
       videoUrl: string
     }>
@@ -334,6 +382,16 @@ function serializeCached(
       viewsPerDay: video.viewsPerDay,
       engagementRate: video.engagementRate,
       velocityIndex: video.velocityIndex,
+      momentumViewsPerDay: video.momentumViewsPerDay,
+      momentumGrowthPct: video.momentumGrowthPct,
+      momentumSampleHours: video.momentumSampleHours,
+      opportunityScore: video.opportunityScore,
+      scoringConfidence: video.scoringConfidence === 'high' || video.scoringConfidence === 'medium'
+        ? video.scoringConfidence
+        : 'limited',
+      scoringComponents: parseJsonRecord(video.scoringComponents),
+      opportunityRationale: parseJsonStringArray(video.opportunityRationale),
+      momentumObservationCount: video.momentumObservationCount,
       thumbnailUrl: video.thumbnailUrl,
       videoUrl: video.videoUrl,
     })),
@@ -501,11 +559,73 @@ async function performMarketSearch(input: YoutubeMarketSearchInput, cacheKey: st
     },
   })
 
+  const videoIds = normalized.map((video) => video.videoId)
+  const previousObservations = videoIds.length > 0
+    ? await db.youtubeMarketVideoObservation.findMany({
+        where: {
+          queryId: queryRow.id,
+          videoId: { in: videoIds },
+          capturedAt: {
+            lt: observedAt,
+            gte: new Date(observedAt.getTime() - 10 * 24 * 60 * 60 * 1000),
+          },
+        },
+        orderBy: { capturedAt: 'desc' },
+        select: { videoId: true, viewCount: true, capturedAt: true },
+      })
+    : []
+
+  const observationsByVideo = new Map<string, typeof previousObservations>()
+  for (const observation of previousObservations) {
+    const existing = observationsByVideo.get(observation.videoId) ?? []
+    existing.push(observation)
+    observationsByVideo.set(observation.videoId, existing)
+  }
+
+  const scored: ScoredStoredVideo[] = normalized.map((video) => {
+    const history = observationsByVideo.get(video.videoId) ?? []
+    const previous = history[0]
+    const sampleHours = previous
+      ? (observedAt.getTime() - previous.capturedAt.getTime()) / 3_600_000
+      : null
+    const momentum = previous && sampleHours !== null
+      ? deriveObservedMomentum({
+          currentViews: video.viewCount,
+          previousViews: previous.viewCount,
+          sampleHours,
+        })
+      : null
+
+    const opportunity = scoreYoutubeOpportunity({
+      viewsPerDay: video.viewsPerDay,
+      engagementRate: video.engagementRate,
+      subscriberCount: video.subscriberCount,
+      publishedAt: video.publishedAt,
+      momentumViewsPerDay: momentum?.viewsPerDay ?? null,
+      momentumGrowthPct: momentum?.growthPct ?? null,
+      momentumSampleHours: momentum?.sampleHours ?? null,
+      sampleVelocityIndex: video.velocityIndex,
+      observationCount: history.length + 1,
+    }, observedAt)
+
+    return {
+      ...video,
+      momentumViewsPerDay: momentum?.viewsPerDay ?? null,
+      momentumGrowthPct: momentum?.growthPct ?? null,
+      momentumSampleHours: momentum?.sampleHours ?? null,
+      opportunityScore: opportunity.score,
+      scoringConfidence: opportunity.confidence,
+      scoringComponents: JSON.stringify(opportunity.components),
+      opportunityRationale: JSON.stringify(opportunity.rationale),
+      momentumObservationCount: history.length + 1,
+    }
+  })
+
   await db.$transaction(async (tx) => {
     await tx.youtubeMarketVideo.deleteMany({ where: { queryId: queryRow.id } })
-    if (normalized.length > 0) {
+    if (scored.length > 0) {
       await tx.youtubeMarketVideo.createMany({
-        data: normalized.map((video) => ({
+        data: scored.map((video) => ({
           queryId: queryRow.id,
           videoId: video.videoId,
           channelId: video.channelId,
@@ -521,16 +641,70 @@ async function performMarketSearch(input: YoutubeMarketSearchInput, cacheKey: st
           viewsPerDay: video.viewsPerDay,
           engagementRate: video.engagementRate,
           velocityIndex: video.velocityIndex,
+          momentumViewsPerDay: video.momentumViewsPerDay,
+          momentumGrowthPct: video.momentumGrowthPct,
+          momentumSampleHours: video.momentumSampleHours,
+          opportunityScore: video.opportunityScore,
+          scoringConfidence: video.scoringConfidence,
+          scoringComponents: video.scoringComponents,
+          opportunityRationale: video.opportunityRationale,
+          momentumObservationCount: video.momentumObservationCount,
           thumbnailUrl: video.thumbnailUrl,
           videoUrl: video.videoUrl,
           createdAt: observedAt,
           updatedAt: observedAt,
         })),
       })
+
+      await tx.youtubeMarketVideoObservation.createMany({
+        data: scored.map((video) => ({
+          queryId: queryRow.id,
+          videoId: video.videoId,
+          channelId: video.channelId,
+          channelTitle: video.channelTitle,
+          title: video.title,
+          publishedAt: video.publishedAt,
+          viewCount: video.viewCount,
+          likeCount: video.likeCount,
+          commentCount: video.commentCount,
+          subscriberCount: video.subscriberCount,
+          viewsPerDay: video.viewsPerDay,
+          engagementRate: video.engagementRate,
+          velocityIndex: video.velocityIndex,
+          capturedAt: observedAt,
+          createdAt: observedAt,
+          updatedAt: observedAt,
+        })),
+        skipDuplicates: true,
+      })
+
+      await tx.youtubeOpportunityScoreSnapshot.createMany({
+        data: scored.map((video) => {
+          const component = parseJsonRecord(video.scoringComponents)
+          return {
+            queryId: queryRow.id,
+            videoId: video.videoId,
+            score: video.opportunityScore,
+            confidence: video.scoringConfidence,
+            algorithmVersion: 'v1',
+            momentumScore: component.momentum?.score ?? 0,
+            demandScore: component.demand?.score ?? 0,
+            engagementScore: component.engagement?.score ?? 0,
+            competitionScore: component.competition?.score ?? 0,
+            freshnessScore: component.freshness?.score ?? 0,
+            components: video.scoringComponents,
+            rationale: video.opportunityRationale,
+            capturedAt: observedAt,
+            createdAt: observedAt,
+            updatedAt: observedAt,
+          }
+        }),
+        skipDuplicates: true,
+      })
     }
     await tx.youtubeMarketQuery.update({
       where: { id: queryRow.id },
-      data: { resultCount: normalized.length, observedAt, expiresAt },
+      data: { resultCount: scored.length, observedAt, expiresAt },
     })
   })
 
@@ -552,7 +726,10 @@ async function performMarketSearch(input: YoutubeMarketSearchInput, cacheKey: st
  * Cached public market discovery. This deliberately does not claim to measure
  * keyword search volume; it ranks only the public videos returned by YouTube.
  */
-export async function searchYoutubeMarket(input: YoutubeMarketSearchInput): Promise<YoutubeMarketSearchResult> {
+export async function searchYoutubeMarket(
+  input: YoutubeMarketSearchInput,
+  options: { forceRefresh?: boolean } = {},
+): Promise<YoutubeMarketSearchResult> {
   const normalizedInput: YoutubeMarketSearchInput = {
     ...input,
     query: input.query.trim().replace(/\s+/g, ' '),
@@ -561,8 +738,10 @@ export async function searchYoutubeMarket(input: YoutubeMarketSearchInput): Prom
     throw new YoutubeMarketError('Query harus berisi 2 sampai 100 karakter.', 400, 'INVALID_QUERY')
   }
   const cacheKey = cacheKeyFor(normalizedInput)
-  const cached = await readCache(cacheKey)
-  if (cached) return cached
+  if (!options.forceRefresh) {
+    const cached = await readCache(cacheKey)
+    if (cached) return cached
+  }
 
   const running = inFlight.get(cacheKey)
   if (running) return running

@@ -596,6 +596,10 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
     'views',
     'estimatedMinutesWatched',
     'averageViewDuration',
+    'averageViewPercentage',
+    'likes',
+    'comments',
+    'shares',
     'subscribersGained',
     'subscribersLost',
   ]
@@ -673,6 +677,10 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
       views: BigInt(Math.trunc(metric('views'))),
       estimatedMinutesWatched: metric('estimatedMinutesWatched'),
       averageViewDuration: metric('averageViewDuration'),
+      averageViewPercentage: metric('averageViewPercentage'),
+      likes: BigInt(Math.trunc(metric('likes'))),
+      comments: BigInt(Math.trunc(metric('comments'))),
+      shares: BigInt(Math.trunc(metric('shares'))),
       subscribersGained: Math.trunc(metric('subscribersGained')),
       subscribersLost: Math.trunc(metric('subscribersLost')),
       estimatedRevenue: input.includeRevenue ? toMetricNumber(index('estimatedRevenue') >= 0 ? values[index('estimatedRevenue')] : 0, true) : null,
@@ -691,6 +699,10 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
           views: row.views,
           estimatedMinutesWatched: row.estimatedMinutesWatched,
           averageViewDuration: row.averageViewDuration,
+          averageViewPercentage: row.averageViewPercentage,
+          likes: row.likes,
+          comments: row.comments,
+          shares: row.shares,
           subscribersGained: row.subscribersGained,
           subscribersLost: row.subscribersLost,
           estimatedRevenue: row.estimatedRevenue,
@@ -701,6 +713,10 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
           views: row.views,
           estimatedMinutesWatched: row.estimatedMinutesWatched,
           averageViewDuration: row.averageViewDuration,
+          averageViewPercentage: row.averageViewPercentage,
+          likes: row.likes,
+          comments: row.comments,
+          shares: row.shares,
           subscribersGained: row.subscribersGained,
           subscribersLost: row.subscribersLost,
           ...(input.includeRevenue ? {
@@ -718,6 +734,10 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
     views: row.views.toString(),
     estimatedMinutesWatched: row.estimatedMinutesWatched,
     averageViewDuration: row.averageViewDuration,
+    averageViewPercentage: row.averageViewPercentage,
+    likes: row.likes.toString(),
+    comments: row.comments.toString(),
+    shares: row.shares.toString(),
     subscribersGained: row.subscribersGained,
     subscribersLost: row.subscribersLost,
     estimatedRevenue: row.estimatedRevenue,
@@ -739,6 +759,103 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
       'Pendapatan adalah estimasi dalam IDR dan dapat disesuaikan pada akhir bulan.',
       'Akses revenue bergantung pada izin monetisasi akun/channel Google yang terhubung.',
     ],
+  }
+}
+
+function formatPacificDate(date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function shiftDate(dateValue: string, days: number): string {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, month - 1, day + days))
+  return shifted.toISOString().slice(0, 10)
+}
+
+/**
+ * Scheduled private Analytics sync. First connection gets a 365-day backfill;
+ * subsequent daily runs re-fetch a 14-day overlap to capture YouTube revisions.
+ * Google reports are delayed, so the sync ends two Pacific days behind today.
+ */
+export async function syncYoutubeAnalyticsBatch(limit = 20) {
+  const today = formatPacificDate()
+  const endDate = shiftDate(today, -2)
+  const cutoff = new Date(Date.now() - 20 * 60 * 60 * 1000)
+  const channels = await db.youtubeChannel.findMany({
+    where: {
+      connectionStatus: 'connected',
+      oauthConnectionId: { not: null },
+      oauthConnection: { is: { connectionStatus: 'connected' } },
+      OR: [
+        { lastAnalyticsSyncedAt: null },
+        { lastAnalyticsSyncedAt: { lt: cutoff } },
+      ],
+    },
+    orderBy: [{ lastAnalyticsSyncedAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
+    take: Math.max(1, Math.min(40, limit)),
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+      lastAnalyticsSyncedAt: true,
+      oauthConnection: {
+        select: { scopes: true, connectionStatus: true },
+      },
+    },
+  })
+
+  let succeeded = 0
+  let failed = 0
+  let rowsSynced = 0
+  const skipped = 0
+
+  for (const channel of channels) {
+    try {
+      const includeRevenue = grantedScopes(channel.oauthConnection?.scopes)
+        .includes(MONETARY_SCOPE)
+      const startDate = channel.lastAnalyticsSyncedAt
+        ? shiftDate(endDate, -13)
+        : shiftDate(endDate, -364)
+
+      const report = await queryYoutubeAnalytics({
+        userId: channel.userId,
+        channelId: channel.id,
+        startDate,
+        endDate,
+        includeRevenue,
+      })
+
+      await db.youtubeChannel.update({
+        where: { id: channel.id },
+        data: {
+          lastAnalyticsSyncedAt: new Date(),
+          analyticsSyncError: null,
+        },
+      })
+      rowsSynced += report.rowCount
+      succeeded++
+    } catch (error) {
+      const message = error instanceof Error ? error.message.slice(0, 400) : 'Analytics sync failed.'
+      await db.youtubeChannel.update({
+        where: { id: channel.id },
+        data: { analyticsSyncError: message },
+      }).catch(() => undefined)
+      failed++
+    }
+  }
+
+  return {
+    eligibleChannels: channels.length,
+    succeeded,
+    failed,
+    skipped,
+    rowsSynced,
+    reportEndDate: endDate,
   }
 }
 
