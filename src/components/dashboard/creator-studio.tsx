@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useT } from '@/lib/i18n'
 
 type Channel = { id: string; title: string }
@@ -173,13 +173,13 @@ export function CreatorStudioDashboard() {
     {tab==='footage'?<section className="space-y-5">
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">{label('rightsNotice')}</div>
       <form onSubmit={addFootage} className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-2">
-        <Field label={label('assetTitle')}><input required value={footage.title} onChange={e=>updateFootage('title',e.target.value)} className="studio-input"/></Field>
-        <Field label={label('sourceName')}><input required value={footage.sourceName} onChange={e=>updateFootage('sourceName',e.target.value)} className="studio-input"/></Field>
-        <Field label={label('sourceUrl')}><input required type="url" placeholder="https://" value={footage.sourceUrl} onChange={e=>updateFootage('sourceUrl',e.target.value)} className="studio-input"/></Field>
-        <Field label={label('assetUrl')}><input required type="url" placeholder="https://" value={footage.assetUrl} onChange={e=>updateFootage('assetUrl',e.target.value)} className="studio-input"/></Field>
-        <Field label={label('license')}><select value={footage.licenseType} onChange={e=>updateFootage('licenseType',e.target.value)} className="studio-input">{licenseOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field>
-        <Field label={label('evidenceUrl')}><input type="url" placeholder="https://" value={footage.rightsEvidenceUrl} onChange={e=>updateFootage('rightsEvidenceUrl',e.target.value)} className="studio-input"/></Field>
-        <Field label={label('evidenceNotes')}><textarea value={footage.rightsEvidenceNotes} onChange={e=>updateFootage('rightsEvidenceNotes',e.target.value)} className="studio-input min-h-20"/></Field>
+        <Field label={label('assetTitle')}><input required value={footage.title} onChange={e=>updateFootage('title',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"/></Field>
+        <Field label={label('sourceName')}><input required value={footage.sourceName} onChange={e=>updateFootage('sourceName',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"/></Field>
+        <Field label={label('sourceUrl')}><input required type="url" placeholder="https://" value={footage.sourceUrl} onChange={e=>updateFootage('sourceUrl',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"/></Field>
+        <Field label={label('assetUrl')}><input required type="url" placeholder="https://" value={footage.assetUrl} onChange={e=>updateFootage('assetUrl',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"/></Field>
+        <Field label={label('license')}><select value={footage.licenseType} onChange={e=>updateFootage('licenseType',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3">{licenseOptions.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field>
+        <Field label={label('evidenceUrl')}><input type="url" placeholder="https://" value={footage.rightsEvidenceUrl} onChange={e=>updateFootage('rightsEvidenceUrl',e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"/></Field>
+        <Field label={label('evidenceNotes')}><textarea value={footage.rightsEvidenceNotes} onChange={e=>updateFootage('rightsEvidenceNotes',e.target.value)} className="min-h-20 w-full rounded-md border border-input bg-background p-3"/></Field>
         <div className="flex flex-wrap items-center gap-4 text-sm md:col-span-2">
           <label className="flex items-center gap-2"><input type="checkbox" checked={footage.commercialUse} onChange={e=>updateFootage('commercialUse',e.target.checked)}/>{label('commercialUse')}</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={footage.modificationAllowed} onChange={e=>updateFootage('modificationAllowed',e.target.checked)}/>{label('modifications')}</label>
@@ -193,8 +193,8 @@ export function CreatorStudioDashboard() {
 
     {tab==='thumbnails'?<section className="space-y-4">
       {videos.length===0?<p className="rounded-lg border border-border p-4 text-sm text-muted-foreground">{label('noCompletedVideo')}</p>:<form onSubmit={generateThumbnail} className="space-y-3 rounded-xl border border-border bg-card p-4">
-        <Field label={label('videoProject')}><select value={projectId} onChange={e=>setProjectId(e.target.value)} className="studio-input">{videos.map(video=><option key={video.id} value={video.id}>{video.title||video.topic}</option>)}</select></Field>
-        <Field label={label('creativeDirection')}><textarea required minLength={8} maxLength={900} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder={label('promptPlaceholder')} className="studio-input min-h-24"/></Field>
+        <Field label={label('videoProject')}><select value={projectId} onChange={e=>setProjectId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3">{videos.map(video=><option key={video.id} value={video.id}>{video.title||video.topic}</option>)}</select></Field>
+        <Field label={label('creativeDirection')}><textarea required minLength={8} maxLength={900} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder={label('promptPlaceholder')} className="min-h-24 w-full rounded-md border border-input bg-background p-3"/></Field>
         <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{label('generationNote')}</p><button disabled={busy||!projectId||prompt.trim().length<8} className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50">{busy?label('generating'):label('generate')}</button></div>
       </form>}
       <div className="space-y-3"><h2 className="text-lg font-semibold">{label('variations')}</h2>{variants.length===0?<p className="rounded-lg border border-border p-4 text-sm text-muted-foreground">{label('noVariants')}</p>:<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{variants.map(v=><article key={v.id} className="overflow-hidden rounded-xl border border-border bg-card"><img src={v.previewUrl} alt={label('thumbnailAlt')} className="aspect-video w-full object-cover"/><div className="space-y-2 p-3"><p className="line-clamp-2 text-xs text-muted-foreground">{v.prompt}</p>{v.isSelected?<span className="inline-flex rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{label('selected')}</span>:<button disabled={busy} onClick={()=>selectThumbnail(v.id)} className="h-9 rounded-md border border-border px-3 text-sm">{label('selectFinal')}</button>}<button onClick={()=>deleteThumbnail(v.id)} className="ml-3 text-xs text-destructive underline">{label('delete')}</button></div></article>)}</div>}</div>
@@ -202,4 +202,4 @@ export function CreatorStudioDashboard() {
   </div>
 }
 function Metric({label,value,note}:{label:string;value:string;note?:string}){return <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-xl font-semibold tabular-nums">{value}</p>{note?<p className="mt-1 text-xs text-muted-foreground">{note}</p>:null}</div>}
-function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block space-y-2 text-sm"><span>{label}</span>{children}</label>}
+function Field({label,children}:{label:string;children:ReactNode}){return <label className="block space-y-2 text-sm"><span>{label}</span>{children}</label>}
