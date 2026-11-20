@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
-import { RefreshCw, UploadCloud, Youtube, CheckCircle2, Clock3, AlertCircle, RotateCcw, XCircle, ExternalLink } from "lucide-react"
+import { RefreshCw, UploadCloud, Clapperboard, CheckCircle2, Clock3, AlertCircle, RotateCcw, XCircle, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -134,7 +134,7 @@ export function YoutubePublishingDashboard() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Youtube className="h-4 w-4" /> YouTube Studio</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clapperboard className="h-4 w-4" /> YouTube Studio</div>
           <h1 className="text-2xl font-bold tracking-tight">Publishing & Automation</h1>
           <p className="text-sm text-muted-foreground">Kelola persetujuan, jadwal, progres upload, dan riwayat publikasi.</p>
         </div>
@@ -215,7 +215,7 @@ export function YoutubePublishingDashboard() {
       <section className="space-y-3">
         <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Riwayat publikasi</h2><span className="text-xs text-muted-foreground">{data.items.length} item terakhir</span></div>
         {loading ? <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">Memuat publikasi...</div> : data.items.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center"><Youtube className="mx-auto mb-2 h-8 w-8 text-muted-foreground" /><p className="font-medium">Belum ada publikasi</p><p className="mt-1 text-sm text-muted-foreground">Buat publikasi dari video yang sudah selesai diproses.</p></div>
+          <div className="rounded-xl border border-dashed p-8 text-center"><Clapperboard className="mx-auto mb-2 h-8 w-8 text-muted-foreground" /><p className="font-medium">Belum ada publikasi</p><p className="mt-1 text-sm text-muted-foreground">Buat publikasi dari video yang sudah selesai diproses.</p></div>
         ) : <div className="grid gap-3">
           {data.items.map(item => {
             const status = STATUS[item.status] ?? { label: item.status, variant: "outline" as const }

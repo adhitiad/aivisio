@@ -58,6 +58,8 @@ import { Route as ProtectedDashboardRevenueRouteImport } from './routes/_protect
 import { Route as ApiYoutubeStrategyRouteImport } from './routes/api.youtube.strategy'
 import { Route as ApiYoutubeStrategySnapshotRouteImport } from './routes/api.youtube.strategy.snapshot'
 import { Route as ApiYoutubeRevenueRouteImport } from './routes/api.youtube.revenue'
+import { Route as ApiYoutubePublishRouteImport } from './routes/api.youtube.publish'
+import { Route as ApiYoutubePublishSchedulerRouteImport } from './routes/api.youtube.publish.scheduler'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -268,6 +270,8 @@ const ProtectedDashboardRevenueRoute = ProtectedDashboardRevenueRouteImport.upda
 const ApiYoutubeStrategyRoute = ApiYoutubeStrategyRouteImport.update({ id: '/youtube/strategy', path: '/youtube/strategy', getParentRoute: () => ApiRoute } as any)
 const ApiYoutubeStrategySnapshotRoute = ApiYoutubeStrategySnapshotRouteImport.update({ id: '/youtube/strategy/snapshot', path: '/youtube/strategy/snapshot', getParentRoute: () => ApiRoute } as any)
 const ApiYoutubeRevenueRoute = ApiYoutubeRevenueRouteImport.update({ id: '/youtube/revenue', path: '/youtube/revenue', getParentRoute: () => ApiRoute } as any)
+const ApiYoutubePublishRoute = ApiYoutubePublishRouteImport.update({ id: '/youtube/publish', path: '/youtube/publish', getParentRoute: () => ApiRoute } as any)
+const ApiYoutubePublishSchedulerRoute = ApiYoutubePublishSchedulerRouteImport.update({ id: '/youtube/publish/scheduler', path: '/youtube/publish/scheduler', getParentRoute: () => ApiRoute } as any)
 const ApiAiProvidersTestRoute = ApiAiProvidersTestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -337,6 +341,8 @@ export interface FileRoutesByFullPath {
   '/api/youtube/strategy': typeof ApiYoutubeStrategyRoute
   '/api/youtube/strategy/snapshot': typeof ApiYoutubeStrategySnapshotRoute
   '/api/youtube/revenue': typeof ApiYoutubeRevenueRoute
+  '/api/youtube/publish': typeof ApiYoutubePublishRoute
+  '/api/youtube/publish/scheduler': typeof ApiYoutubePublishSchedulerRoute
   '/api/studio': typeof ApiStudioRoute
 }
 export interface FileRoutesByTo {
@@ -489,6 +495,8 @@ export interface FileRouteTypes {
     | '/api/youtube/strategy'
     | '/api/youtube/strategy/snapshot'
     | '/api/youtube/revenue'
+    | '/api/youtube/publish'
+    | '/api/youtube/publish/scheduler'
     | '/api/youtube/scheduler'
     | '/api/studio'
   fileRoutesByTo: FileRoutesByTo
@@ -939,6 +947,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoutubeRevenueRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/youtube/publish': {
+      id: '/api/youtube/publish'
+      path: '/youtube/publish'
+      fullPath: '/api/youtube/publish'
+      preLoaderRoute: typeof ApiYoutubePublishRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/publish/scheduler': {
+      id: '/api/youtube/publish/scheduler'
+      path: '/youtube/publish/scheduler'
+      fullPath: '/api/youtube/publish/scheduler'
+      preLoaderRoute: typeof ApiYoutubePublishSchedulerRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/studio': {
       id: '/api/studio'
       path: '/studio'
@@ -1057,6 +1079,8 @@ interface ApiRouteChildren {
   ApiYoutubeStrategyRoute: typeof ApiYoutubeStrategyRoute
   ApiYoutubeStrategySnapshotRoute: typeof ApiYoutubeStrategySnapshotRoute
   ApiYoutubeRevenueRoute: typeof ApiYoutubeRevenueRoute
+  ApiYoutubePublishRoute: typeof ApiYoutubePublishRoute
+  ApiYoutubePublishSchedulerRoute: typeof ApiYoutubePublishSchedulerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -1083,6 +1107,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiYoutubeStrategyRoute: ApiYoutubeStrategyRoute,
   ApiYoutubeStrategySnapshotRoute: ApiYoutubeStrategySnapshotRoute,
   ApiYoutubeRevenueRoute: ApiYoutubeRevenueRoute,
+  ApiYoutubePublishRoute: ApiYoutubePublishRoute,
+  ApiYoutubePublishSchedulerRoute: ApiYoutubePublishSchedulerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 
