@@ -1,20 +1,28 @@
-# AIVISO — YouTube Publishing Roadmap
+# AIVISO — YouTube Publishing Reliability & Operations Workstream
 
-**Status terakhir terdokumentasi: P3.8.** Branch pengembangan: `adhitiad_gpt`. P3.9 adalah kandidat tahap berikutnya, belum dimulai.
+> **Penjelasan penomoran:** dokumen ini memakai label historis submilestone YouTube Publishing `P3.1–P3.9`. Label tersebut adalah namespace workstream teknis dan **bukan** Master PHASE 3 AIVISO. Master PHASE 3 adalah Market & Opportunity Engine. Master roadmap berada di [AIVISO-MASTER-ROADMAP.md](./AIVISO-MASTER-ROADMAP.md).
 
-## P3 — Publishing reliability and operations
+**Status terakhir terdokumentasi: YouTube Publishing P3.8.** Branch pengembangan: `adhitiad_gpt`. YouTube Publishing P3.9 adalah kandidat tahap berikutnya, belum dimulai.
+
+## Scope workstream
+
+Workstream ini mengelola reliabilitas alur publikasi YouTube: upload foundation, resumable upload, scheduler, preflight, observability, operations dashboard, worker history, persistent alerts, notification delivery, escalation, external webhook, dan guarded recovery.
+
+Workstream melintasi master PHASE 2 (YouTube integration), PHASE 5 (production), dan PHASE 8 (engineering quality). Ia bukan pengganti atau batas akhir roadmap produk.
+
+## YouTube Publishing submilestones (legacy IDs)
 
 | Milestone | Fokus | Status |
 |---|---|---|
-| P3.1 | Publishing foundation, API, OAuth upload scope, worker/scheduler foundation | Selesai menurut riwayat proyek |
-| P3.2 | Resumable upload reliability, retry/recovery, session reconciliation, dashboard | Selesai menurut riwayat proyek |
-| P3.3 | Scheduled worker workflow, retry configuration, CI/test integration | Selesai menurut riwayat proyek |
-| P3.4 | YouTube preflight dan scheduled publishing safeguards | Selesai menurut riwayat proyek |
-| P3.5 | Production live publishing runbook | Runbook selesai; live upload belum diverifikasi |
-| P3.6 | Observability dan production readiness | Implementasi/CI selesai; production runtime belum diverifikasi |
-| P3.7 | Operational dashboard dan state-derived alert visibility | Implementasi/CI selesai; production runtime belum diverifikasi |
-| P3.8 | Durable worker execution history, persistent alert lifecycle, in-app notification delivery | Implementasi/CI selesai; schema deployment dan production delivery belum diverifikasi |
-| P3.9 | Alert escalation, external webhook integration, recovery automation | **Belum dimulai — proposal** |
+| Publishing P3.1 | Publishing foundation, API, OAuth upload scope, worker/scheduler foundation | Selesai menurut riwayat proyek |
+| Publishing P3.2 | Resumable upload reliability, retry/recovery, session reconciliation, dashboard | Selesai menurut riwayat proyek |
+| Publishing P3.3 | Scheduled worker workflow, retry configuration, CI/test integration | Selesai menurut riwayat proyek |
+| Publishing P3.4 | YouTube preflight dan scheduled publishing safeguards | Selesai menurut riwayat proyek |
+| Publishing P3.5 | Production live publishing runbook | Runbook selesai; live upload belum diverifikasi |
+| Publishing P3.6 | Observability dan production readiness | Implementasi/CI selesai; production runtime belum diverifikasi |
+| Publishing P3.7 | Operational dashboard dan state-derived alert visibility | Implementasi/CI selesai; production runtime belum diverifikasi |
+| Publishing P3.8 | Durable worker execution history, persistent alert lifecycle, in-app notification delivery | Implementasi/CI selesai; schema deployment dan production delivery belum diverifikasi |
+| Publishing P3.9 | Alert escalation, external webhook integration, recovery automation | **Belum dimulai — proposal** |
 
 ## Milestone exit criteria
 
@@ -26,7 +34,7 @@ Sebuah milestone hanya boleh berstatus selesai jika:
 5. Dokumentasi dan handoff diperbarui.
 6. Production-only claims dipisahkan dari hasil CI/staging.
 
-## P3.8 delivered scope
+## Publishing P3.8 delivered scope
 
 - Durable scheduler run records melalui `YoutubeWorkerRun`.
 - Persistent alert lifecycle melalui `YoutubePublishingAlert`.
@@ -35,15 +43,17 @@ Sebuah milestone hanya boleh berstatus selesai jika:
 - Dashboard menampilkan execution history dan alert timestamps.
 - Scheduler POST dan protected health GET melakukan alert synchronization.
 
-## P3.8 limitations
+## Publishing P3.8 limitations
 
 - Notifikasi yang diimplementasikan adalah in-app; email/SMS/push/third-party webhook belum tersedia.
 - External monitor perlu dikonfigurasi untuk polling protected health GET agar stale heartbeat dapat dideteksi ketika scheduled POST berhenti.
-- Run yang prosesnya mati sebelum finalisasi dapat tertinggal dalam status `running`; stale-running reconciliation perlu menjadi perhatian task berikutnya.
+- Run yang prosesnya mati sebelum finalisasi dapat tertinggal dalam status `running`; stale-running reconciliation menjadi perhatian task berikutnya.
 - Database schema deployment dan end-to-end notification delivery pada production belum diverifikasi.
 - CI success tidak membuktikan deployment atau integrasi YouTube live.
 
-## Candidate P3.9 sequence
+## Candidate Publishing P3.9 sequence
+
+Task rinci: [P3.9 Next Task](../tasks/P3.9-NEXT.md).
 
 1. Stale-running execution detection dan reconciliation policy.
 2. Alert acknowledgement/snooze/escalation lifecycle dan severity policy.
