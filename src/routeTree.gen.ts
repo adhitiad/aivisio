@@ -345,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/api/youtube/revenue': typeof ApiYoutubeRevenueRoute
   '/api/youtube/publish': typeof ApiYoutubePublishRoute
   '/api/youtube/publish/scheduler': typeof ApiYoutubePublishSchedulerRoute
+  '/api/youtube/publish/operations': typeof ApiYoutubePublishOperationsRoute
   '/api/studio': typeof ApiStudioRoute
 }
 export interface FileRoutesByTo {
