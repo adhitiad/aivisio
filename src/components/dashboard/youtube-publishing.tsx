@@ -26,7 +26,8 @@ type Operations = {
   status: "ok" | "running" | "degraded" | "unknown"
   queue: Record<string, number>
   worker: { staleUploads: number; overdueJobs: number; heartbeatAgeSeconds: number | null; lastRun: { runId: string; status: string; startedAt: string; completedAt?: string; durationMs?: number; eligible?: number; attempted?: number } | null }
-  alerts: Array<{ id: string; severity: "critical" | "warning"; title: string; detail: string }>
+  alerts: Array<{ id: string; severity: "critical" | "warning"; title: string; detail: string; firstSeenAt: string; lastSeenAt: string; notificationId: string | null }>
+  executionHistory: Array<{ runId: string; status: string; startedAt: string; completedAt: string | null; durationMs: number | null; eligible: number | null; attempted: number | null; error: string | null }>
   recentActivity: Array<{ id: string; title: string; channel: string; status: string; attempts: number; maxAttempts: number; lastError: string | null; updatedAt: string; nextAttemptAt: string }>
 }
 
