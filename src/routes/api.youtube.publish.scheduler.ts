@@ -61,14 +61,19 @@ async function getObservability() {
     log.warn('Stored YouTube worker heartbeat is not valid JSON')
   }
 
-  const lastCompletedAt = lastRun?.completedAt ? new Date(lastRun.completedAt).getTime() : null
-  const schedulerAgeMs = lastCompletedAt === null ? null : Math.max(0, now.getTime() - lastCompletedAt)
-  const schedulerStale = schedulerAgeMs !== null && schedulerAgeMs > STALE_AFTER_MS
+  const lastHeartbeatAt = lastRun?.completedAt ?? lastRun?.startedAt
+  const heartbeatTimestamp = lastHeartbeatAt ? new Date(lastHeartbeatAt).getTime() : null
+  const schedulerAgeMs = heartbeatTimestamp === null || !Number.isFinite(heartbeatTimestamp)
+    ? null
+    : Math.max(0, now.getTime() - heartbeatTimestamp)
+  const schedulerStale = schedulerAgeMs === null || schedulerAgeMs > STALE_AFTER_MS
   const status = staleUploads > 0 || overdueJobs > 0 || schedulerStale || lastRun?.status === 'error'
     ? 'degraded'
-    : lastRun?.status === 'success' && schedulerAgeMs !== null
+    : lastRun?.status === 'success'
       ? 'ok'
-      : 'unknown'
+      : lastRun?.status === 'running'
+        ? 'running'
+        : 'unknown'
 
   return {
     status,
@@ -95,7 +100,7 @@ export const Route = createFileRoute('/api/youtube/publish/scheduler')({
         try {
           const metrics = await getObservability()
           return Response.json(metrics, {
-            status: metrics.status === 'degraded' ? 503 : 200,
+            status: metrics.status === 'ok' || metrics.status === 'running' ? 200 : 503,
             headers: { 'Cache-Control': 'no-store' },
           })
         } catch (error) {

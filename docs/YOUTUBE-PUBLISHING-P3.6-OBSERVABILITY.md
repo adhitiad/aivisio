@@ -8,7 +8,7 @@ P3.6 adds operational visibility for the YouTube publishing worker without intro
 
 The endpoint is protected by the same bearer secret as the scheduler:
 
-- `GET /api/youtube/publish/scheduler` — read operational metrics; returns `200` for healthy/unknown state, `503` when degraded.
+- `GET /api/youtube/publish/scheduler` — read operational metrics; returns `200` only for healthy or actively running state, and `503` for degraded or unknown state.
 - `POST /api/youtube/publish/scheduler` — execute one bounded publishing batch and persist a run heartbeat.
 
 Send `Authorization: Bearer <YOUTUBE_CRON_SECRET>`. Never expose this secret in browser code, client logs, monitoring screenshots, or issue reports. Configure external uptime monitoring to call the GET endpoint from a secret store; do not put the bearer value in a URL.
@@ -24,7 +24,7 @@ The GET response reports:
 - Last scheduler run ID, status, start/completion timestamps, duration, eligible count, and attempted count.
 - Age of the last completed scheduler run.
 
-The endpoint returns `degraded` when there is a stale upload lease, overdue approved queue item, a failed scheduler invocation, or a completed scheduler heartbeat older than 15 minutes. It returns `unknown` before the first recorded scheduler completion; this is not a healthy signal and must be resolved during deployment validation.
+The endpoint returns `degraded` when there is a stale upload lease, overdue approved queue item, a failed scheduler invocation, or a scheduler heartbeat older than 15 minutes. It returns `running` while a recent scheduler invocation is in progress, `ok` after a recent successful invocation, and `unknown` before the first heartbeat. Both `degraded` and `unknown` return HTTP 503 so an external uptime monitor cannot mistake an uninitialized worker for a healthy one. A stuck `running` invocation becomes degraded after 15 minutes.
 
 ## Structured logs and secret handling
 
