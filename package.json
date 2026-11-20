@@ -18,7 +18,8 @@
     "auth:migrate": "bunx @better-auth/cli@latest migrate --config src/lib/auth.ts",
     "test": "bun test",
     "security:encrypt-provider-keys": "bun run scripts/encrypt-provider-keys.ts",
-    "worker:video": "bun run scripts/video-worker.ts"
+    "worker:video": "bun run scripts/video-worker.ts",
+    "media:migrate": "bun run scripts/migrate-media-to-object-storage.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

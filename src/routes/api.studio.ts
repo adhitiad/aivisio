@@ -1,14 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
-import path from 'node:path'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { getApiSession } from '@/lib/session'
 import { adminGate } from '@/lib/admin-gate'
 import { getZAI } from '@/lib/zai'
-import { projectDir } from '@/lib/video/config'
-import { ensureDir } from '@/lib/video/media'
+import { deleteObject, getObject, headObject, putBuffer } from '@/lib/storage/neon-object-storage'
 import { rateLimit } from '@/lib/rate-limit'
 import { sameOriginGuard } from '@/lib/security/http'
 import { hasYoutubeMonetaryScope } from '@/lib/youtube/oauth'
@@ -90,15 +88,23 @@ export const Route = createFileRoute('/api/studio')({
           const fileId = url.searchParams.get('file')
           if (fileId) {
             const variant = await db.thumbnailVariant.findFirst({
-              where: { id: fileId, userId: session.user.id }, select: { imagePath: true },
+              where: { id: fileId, userId: session.user.id }, select: { imagePath: true, objectKey: true },
             })
             if (!variant) return new Response('Thumbnail tidak ditemukan.', { status: 404 })
+            if (variant.objectKey) {
+              const object = await getObject(variant.objectKey)
+              if (!object) return new Response('File thumbnail tidak tersedia.', { status: 404 })
+              return new Response(object.body, {
+                headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },
+              })
+            }
+            if (!variant.imagePath) return new Response('File thumbnail tidak tersedia.', { status: 404 })
             try {
               const image = await fs.readFile(variant.imagePath)
               return new Response(new Uint8Array(image), {
                 headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },
               })
-            } catch { return new Response('File thumbnail tidak tersedia.', { status: 404 }) }
+            } catch { return new Response('File thumbnail tidak tersedia. Jalankan media:migrate.', { status: 404 }) }
           }
           const projectId = url.searchParams.get('projectId')
           if (!projectId || projectId.length > 80) return Response.json({ error: 'Project video wajib dipilih.' }, { status: 400 })
@@ -215,7 +221,7 @@ export const Route = createFileRoute('/api/studio')({
           if (!project) return Response.json({ error: 'Thumbnail hanya tersedia untuk video selesai milik akun ini.' }, { status: 404 })
           const count = await db.thumbnailVariant.count({ where: { userId: session.user.id, videoProjectId: project.id } })
           if (count >= 12) return Response.json({ error: 'Maksimal 12 variasi thumbnail per project.' }, { status: 409 })
-          let generatedImagePath: string | null = null
+          let generatedObjectKey: string | null = null
           try {
             const prompt = [
               'Create a professional high-click-through-rate YouTube thumbnail, landscape 16:9.',
@@ -230,21 +236,40 @@ export const Route = createFileRoute('/api/studio')({
             if (!base64) throw new Error('Provider tidak mengembalikan gambar.')
             const image = Buffer.from(base64, 'base64')
             if (image.byteLength < 1024 || image.byteLength > 15 * 1024 * 1024) throw new Error('Ukuran thumbnail tidak valid.')
-            const directory = path.join(projectDir(project.id), 'thumbnail-lab')
-            await ensureDir(directory)
             const id = randomUUID()
-            const imagePath = path.join(directory, id + '.png')
-            await fs.writeFile(imagePath, image, { flag: 'wx' })
-            generatedImagePath = imagePath
+            const objectKey = 'media/users/' + session.user.id + '/projects/' + project.id + '/thumbnails/' + id + '.png'
+            const uploaded = await putBuffer(objectKey, image, 'image/png')
+            generatedObjectKey = objectKey
+            const verified = await headObject(objectKey)
+            if (!verified || verified.size !== uploaded.size || verified.sha256 !== uploaded.sha256) {
+              throw new Error('Verifikasi thumbnail di Object Storage gagal.')
+            }
+            await db.mediaAsset.upsert({
+              where: { objectKey },
+              create: {
+                userId: session.user.id,
+                videoProjectId: project.id,
+                kind: 'thumbnail_variant',
+                objectKey,
+                mimeType: 'image/png',
+                sizeBytes: BigInt(uploaded.size),
+                sha256: uploaded.sha256,
+                originalName: id + '.png',
+              },
+              update: { sizeBytes: BigInt(uploaded.size), sha256: uploaded.sha256, originalName: id + '.png' },
+            })
             const variant = await db.thumbnailVariant.create({
-              data: { id, userId: session.user.id, videoProjectId: project.id, prompt: parsed.data.prompt, aspect: '16:9', imagePath, provider: 'z-ai' },
+              data: { id, userId: session.user.id, videoProjectId: project.id, prompt: parsed.data.prompt, aspect: '16:9', imagePath: null, objectKey, provider: 'z-ai' },
               select: { id: true, prompt: true, aspect: true, isSelected: true, createdAt: true },
             })
             return Response.json({ variant: { ...variant, previewUrl: '/api/studio?resource=thumbnails&file=' + id } }, { status: 201 })
           } catch (error) {
-            if (generatedImagePath) await fs.rm(generatedImagePath, { force: true }).catch(() => {})
+            if (generatedObjectKey) {
+              await deleteObject(generatedObjectKey).catch(() => {})
+              await db.mediaAsset.deleteMany({ where: { objectKey: generatedObjectKey } }).catch(() => {})
+            }
             log.error({ err: error instanceof Error ? error.message.slice(0, 180) : 'unknown' }, 'thumbnail generation failed')
-            return Response.json({ error: 'Gagal membuat thumbnail. Periksa konfigurasi provider AI.' }, { status: 502 })
+            return Response.json({ error: 'Gagal membuat thumbnail. Periksa konfigurasi provider AI dan Neon Object Storage.' }, { status: 502 })
           }
         }
         return Response.json({ error: 'Resource Creator Studio tidak dikenal.' }, { status: 400 })
@@ -315,11 +340,15 @@ export const Route = createFileRoute('/api/studio')({
           const id = url.searchParams.get('id')
           if (!id || id.length > 80) return Response.json({ error: 'ID variasi thumbnail tidak valid.' }, { status: 400 })
           const variant = await db.thumbnailVariant.findFirst({
-            where: { id, userId: session.user.id }, select: { id: true, imagePath: true },
+            where: { id, userId: session.user.id }, select: { id: true, imagePath: true, objectKey: true },
           })
           if (!variant) return Response.json({ error: 'Variasi thumbnail tidak ditemukan.' }, { status: 404 })
+          if (variant.objectKey) {
+            await deleteObject(variant.objectKey)
+            await db.mediaAsset.deleteMany({ where: { objectKey: variant.objectKey } })
+          }
           await db.thumbnailVariant.delete({ where: { id: variant.id } })
-          await fs.rm(variant.imagePath, { force: true }).catch(() => {})
+          if (variant.imagePath) await fs.rm(variant.imagePath, { force: true }).catch(() => {})
           return Response.json({ success: true })
         }
         return Response.json({ error: 'Resource Creator Studio tidak dikenal.' }, { status: 400 })

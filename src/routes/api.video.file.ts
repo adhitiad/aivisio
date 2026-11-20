@@ -5,14 +5,28 @@ import { Readable } from 'node:stream'
 import { db } from '@/lib/db'
 import { projectDir } from '@/lib/video/config'
 import { getApiSession } from '@/lib/session'
+import { getObject, headObject } from '@/lib/storage/neon-object-storage'
 
 function slugify(text: string): string {
-  const value = text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
+  const value = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
   return value || 'aiviso-video'
+}
+
+function parseRange(value: string | null, size: number): { start: number; end: number } | null | false {
+  if (!value) return null
+  if (value.includes(',')) return false
+  const match = value.match(/^bytes=(\d*)-(\d*)$/)
+  if (!match || (!match[1] && !match[2])) return false
+  let start = match[1] ? Number(match[1]) : 0
+  let end = match[2] ? Number(match[2]) : size - 1
+  if (!match[1] && match[2]) {
+    const suffix = Number(match[2])
+    if (!Number.isSafeInteger(suffix) || suffix <= 0) return false
+    start = Math.max(0, size - suffix)
+    end = size - 1
+  }
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || start >= size) return false
+  return { start, end: Math.min(end, size - 1) }
 }
 
 export const Route = createFileRoute('/api/video/file')({
@@ -28,9 +42,7 @@ export const Route = createFileRoute('/api/video/file')({
 
         const sceneParam = searchParams.get('scene')
         const download = searchParams.get('download') === '1'
-        const project = await db.videoProject.findFirst({
-          where: { id, userId: session.user.id },
-        })
+        const project = await db.videoProject.findFirst({ where: { id, userId: session.user.id } })
         if (!project) return new Response('Project tidak ditemukan.', { status: 404 })
 
         if (sceneParam !== null) {
@@ -38,9 +50,24 @@ export const Route = createFileRoute('/api/video/file')({
           if (!Number.isInteger(idx) || idx < 1 || idx > project.scenesTotal) {
             return new Response('Scene tidak valid.', { status: 400 })
           }
-          const file = projectDir(id) + '/scene-' + idx + '.jpg'
+          const asset = await db.mediaAsset.findFirst({
+            where: { videoProjectId: id, kind: 'scene_thumbnail', originalName: 'scene-' + idx + '.jpg' },
+            select: { objectKey: true },
+          })
+          if (asset?.objectKey) {
+            const object = await getObject(asset.objectKey)
+            if (!object) return new Response('Thumbnail belum tersedia.', { status: 404 })
+            return new Response(object.body, {
+              headers: {
+                'Content-Type': 'image/jpeg',
+                'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
+              },
+            })
+          }
+          // Legacy fallback is retained only for projects not yet migrated.
           try {
-            const buffer = await fsp.readFile(file)
+            const buffer = await fsp.readFile(projectDir(id) + '/scene-' + idx + '.jpg')
             return new Response(new Uint8Array(buffer), {
               headers: {
                 'Content-Type': 'image/jpeg',
@@ -49,20 +76,9 @@ export const Route = createFileRoute('/api/video/file')({
               },
             })
           } catch {
-            return new Response('Thumbnail belum tersedia.', { status: 404 })
+            return new Response('Thumbnail belum tersedia. Jalankan media:migrate untuk memindahkan aset lama.', { status: 404 })
           }
         }
-
-        const filePath = project.filePath
-        if (!filePath) return new Response('Video belum tersedia.', { status: 404 })
-
-        let stat: fs.Stats
-        try {
-          stat = await fsp.stat(filePath)
-        } catch {
-          return new Response('File video hilang.', { status: 404 })
-        }
-        if (!stat.isFile()) return new Response('File video tidak valid.', { status: 404 })
 
         const filename = 'aiviso-' + slugify(project.title || project.topic) + '.mp4'
         const headers: Record<string, string> = {
@@ -71,36 +87,49 @@ export const Route = createFileRoute('/api/video/file')({
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         }
-        if (download) {
-          headers['Content-Disposition'] = 'attachment; filename="' + filename + '"'
+        if (download) headers['Content-Disposition'] = 'attachment; filename="' + filename + '"'
+
+        if (project.fileObjectKey) {
+          const head = await headObject(project.fileObjectKey)
+          if (!head || head.size <= 0) return new Response('Video belum tersedia di Object Storage.', { status: 404 })
+          const range = parseRange(request.headers.get('range'), head.size)
+          if (range === false) {
+            return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + head.size, 'Cache-Control': 'private, no-store' } })
+          }
+          const object = await getObject(project.fileObjectKey, range ? 'bytes=' + range.start + '-' + range.end : undefined)
+          if (!object) return new Response('File video tidak ditemukan.', { status: 404 })
+          const contentLength = range ? range.end - range.start + 1 : head.size
+          const responseHeaders = { ...headers, 'Content-Length': String(contentLength) }
+          if (range) responseHeaders['Content-Range'] = 'bytes ' + range.start + '-' + range.end + '/' + head.size
+          return new Response(object.body, { status: range ? 206 : 200, headers: responseHeaders })
         }
 
-        const range = request.headers.get('range')
-        const match = range?.match(/bytes=(\d*)-(\d*)/)
-        if (match) {
-          const start = match[1] ? Number.parseInt(match[1], 10) : 0
-          const end = match[2] ? Math.min(Number.parseInt(match[2], 10), stat.size - 1) : stat.size - 1
-          if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= stat.size) {
-            return new Response(null, {
-              status: 416,
-              headers: { 'Content-Range': 'bytes */' + stat.size, 'Cache-Control': 'private, no-store' },
-            })
-          }
-          const stream = fs.createReadStream(filePath, { start, end })
+        // Compatibility path for objects awaiting the one-time migration script.
+        const filePath = project.filePath
+        if (!filePath) return new Response('Video belum tersedia.', { status: 404 })
+        let fileStat: fs.Stats
+        try { fileStat = await fsp.stat(filePath) }
+        catch { return new Response('File video hilang. Jalankan media:migrate untuk memindahkannya.', { status: 404 }) }
+        if (!fileStat.isFile()) return new Response('File video tidak valid.', { status: 404 })
+        const range = parseRange(request.headers.get('range'), fileStat.size)
+        if (range === false) {
+          return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + fileStat.size, 'Cache-Control': 'private, no-store' } })
+        }
+        if (range) {
+          const stream = fs.createReadStream(filePath, { start: range.start, end: range.end })
           return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
             status: 206,
             headers: {
               ...headers,
-              'Content-Range': 'bytes ' + start + '-' + end + '/' + stat.size,
-              'Content-Length': String(end - start + 1),
+              'Content-Range': 'bytes ' + range.start + '-' + range.end + '/' + fileStat.size,
+              'Content-Length': String(range.end - range.start + 1),
             },
           })
         }
-
         const stream = fs.createReadStream(filePath)
         return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
           status: 200,
-          headers: { ...headers, 'Content-Length': String(stat.size) },
+          headers: { ...headers, 'Content-Length': String(fileStat.size) },
         })
       },
     },

@@ -4,6 +4,7 @@ import { db } from '../src/lib/db'
 import { moduleLogger } from '../src/lib/logger'
 import { runVideoPipeline } from '../src/lib/video/pipeline'
 import { retryDelayMs } from '../src/lib/video/worker-utils'
+import { closeRedisClient, dequeueVideoJob, enqueueVideoJob } from '../src/lib/redis/video-queue'
 
 const log = moduleLogger('video-worker')
 const workerId = (process.env.HOSTNAME || hostname()) + '-' + process.pid + '-' + randomUUID().slice(0, 8)
@@ -29,11 +30,18 @@ async function failExhausted(staleBefore: Date) {
     data: { status: 'error', stageDetail: 'Worker kehabisan percobaan.', error: 'Worker berhenti merespons setelah batas retry.' },
   })
 }
-async function claimNextJob() {
+async function claimNextJob(hintedProjectId?: string | null) {
   const now = new Date()
   const staleBefore = new Date(now.getTime() - leaseMs)
   await failExhausted(staleBefore)
-  const candidate = await db.videoJob.findFirst({
+  const hinted = hintedProjectId
+    ? await db.videoJob.findUnique({ where: { videoProjectId: hintedProjectId } })
+    : null
+  const hintedIsClaimable = Boolean(hinted && hinted.attempts < maxAttempts && (
+    (hinted.status === 'queued' && hinted.availableAt <= now) ||
+    (hinted.status === 'processing' && (!hinted.heartbeatAt || hinted.heartbeatAt < staleBefore))
+  ))
+  const candidate = hintedIsClaimable ? hinted : await db.videoJob.findFirst({
     where: { attempts: { lt: maxAttempts }, OR: [
       { status: 'queued', availableAt: { lte: now } },
       { status: 'processing', heartbeatAt: { lt: staleBefore } },
@@ -87,16 +95,45 @@ async function processJob(job: { id: string; videoProjectId: string; attempt: nu
         ? { status: 'queued', stageDetail: 'Gagal sementara; menunggu retry worker...', error: message }
         : { status: 'error', stageDetail: 'Worker gagal permanen.', error: message },
     })
+    if (retry) {
+      try { await enqueueVideoJob(job.videoProjectId) }
+      catch (queueError) {
+        log.warn({ videoProjectId: job.videoProjectId, err: queueError instanceof Error ? queueError.message.slice(0, 160) : 'unknown' }, 'retry hint not queued; PostgreSQL reconciliation will recover')
+      }
+    }
     log.error({ videoProjectId: job.videoProjectId, attempt: job.attempt, retry, err: message }, 'video job failed')
   } finally { clearInterval(heartbeat) }
 }
 async function main() {
   log.info({ workerId, pollMs, leaseMs, maxAttempts }, 'durable video worker started')
+  let redisUnavailableLoggedAt = 0
   while (!stopping) {
-    try { const job = await claimNextJob(); if (job) { await processJob(job); continue } }
-    catch (error) { log.error({ err: error instanceof Error ? error.message.slice(0, 240) : 'unknown' }, 'worker loop error') }
-    await sleep(pollMs)
+    try {
+      const hintedProjectId = await dequeueVideoJob(2)
+      const job = await claimNextJob(hintedProjectId)
+      if (job) { await processJob(job); continue }
+      // Reconcile PostgreSQL even when Redis is healthy: a process may have crashed
+      // between committing VideoJob and publishing its Redis wake-up hint.
+      if (!hintedProjectId) {
+        const recovered = await claimNextJob()
+        if (recovered) { await processJob(recovered); continue }
+      }
+    } catch (error) {
+      const now = Date.now()
+      if (now - redisUnavailableLoggedAt > 30_000) {
+        redisUnavailableLoggedAt = now
+        log.warn({ err: error instanceof Error ? error.message.slice(0, 220) : 'unknown' }, 'Redis unavailable; processing durable PostgreSQL queue')
+      }
+      try {
+        const recovered = await claimNextJob()
+        if (recovered) { await processJob(recovered); continue }
+      } catch (dbError) {
+        log.error({ err: dbError instanceof Error ? dbError.message.slice(0, 220) : 'unknown' }, 'PostgreSQL fallback claim failed')
+      }
+      await sleep(pollMs)
+    }
   }
+  await closeRedisClient().catch(() => {})
   await db.$disconnect()
   log.info({ workerId }, 'video worker stopped')
 }

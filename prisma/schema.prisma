@@ -27,6 +27,7 @@ model User {
   videoProjects VideoProject[]
   footageAssets FootageAsset[]
   thumbnailVariants ThumbnailVariant[]
+  mediaAssets   MediaAsset[]
   youtubeChannels YoutubeChannel[]
   youtubeOAuthConnection YoutubeOAuthConnection?
   youtubeOAuthStates YoutubeOAuthState[]
@@ -130,11 +131,13 @@ model VideoProject {
   scenesTotal     Int      @default(0)
   scenesDone      Int      @default(0)
   durationSec     Int      @default(0)
-  filePath        String?
+  filePath        String? // legacy path; cleared after successful object-storage upload
+  fileObjectKey   String?
   fileBytes       Int      @default(0)
   scenes          String   @default("[]")
   videoJob        VideoJob?
   thumbnailVariants ThumbnailVariant[]
+  mediaAssets     MediaAsset[]
   error           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -618,7 +621,8 @@ model ThumbnailVariant {
   videoProjectId String
   prompt         String
   aspect         String       @default("16:9")
-  imagePath      String
+  imagePath      String? // legacy local path; cleared after migration
+  objectKey      String?
   provider       String       @default("z-ai")
   model          String?
   isSelected     Boolean      @default(false)
@@ -629,4 +633,25 @@ model ThumbnailVariant {
 
   @@index([userId, videoProjectId, createdAt])
   @@index([videoProjectId, isSelected])
+}
+
+
+model MediaAsset {
+  id             String        @id @default(uuid(7))
+  userId         String?
+  videoProjectId String?
+  kind           String // final_video | scene_thumbnail | thumbnail_variant | uploaded_footage
+  objectKey      String        @unique
+  mimeType       String
+  sizeBytes      BigInt
+  sha256         String
+  originalName   String
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  videoProject   VideoProject? @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([videoProjectId, kind])
+  @@index([kind, createdAt])
 }

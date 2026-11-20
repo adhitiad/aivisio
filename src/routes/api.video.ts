@@ -12,6 +12,8 @@ import {
   type Aspect,
 } from '@/lib/video/config'
 import { moduleLogger } from '@/lib/logger'
+import { deleteObject } from '@/lib/storage/neon-object-storage'
+import { enqueueVideoJob } from '@/lib/redis/video-queue'
 import { getApiSession } from '@/lib/session'
 import { rateLimit } from '@/lib/rate-limit'
 import { sameOriginGuard } from '@/lib/security/http'
@@ -140,6 +142,12 @@ export const Route = createFileRoute('/api/video')({
             await tx.videoJob.create({ data: { videoProjectId: project.id } })
             return project
           })
+          try {
+            await enqueueVideoJob(created.id)
+          } catch (queueError) {
+            // PostgreSQL remains the durable queue; the worker reconciles rows when Redis is unavailable.
+            log.warn({ id: created.id, err: queueError instanceof Error ? queueError.message.slice(0, 180) : 'unknown' }, 'Redis enqueue unavailable; PostgreSQL fallback retained')
+          }
           log.info(
             { id: created.id, userId: session.user.id, format, aspect, renderMode, researchEnabled },
             'project video dibuat',
@@ -281,6 +289,11 @@ export const Route = createFileRoute('/api/video')({
           if (!project) {
             return Response.json({ error: 'Project video tidak ditemukan.' }, { status: 404 })
           }
+          const mediaAssets = await db.mediaAsset.findMany({
+            where: { videoProjectId: project.id },
+            select: { objectKey: true },
+          })
+          for (const asset of mediaAssets) await deleteObject(asset.objectKey)
           await db.videoProject.delete({ where: { id: project.id } })
           await removeMediaDir(id)
           return Response.json({ ok: true })
