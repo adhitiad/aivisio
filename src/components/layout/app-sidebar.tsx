@@ -5,7 +5,6 @@ import { usePathname } from "@/lib/router";
 import {
   Clapperboard,
   ChartLine,
-  Clapperboard,
   History,
   LayoutDashboard,
   Mail,
