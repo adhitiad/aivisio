@@ -344,7 +344,7 @@ function serializeCached(
       momentumViewsPerDay: number | null
       momentumGrowthPct: number | null
       momentumSampleHours: number | null
-      opportunityScore: number
+      opportunityScore: number | null
       scoringConfidence: string | null
       scoringComponents: string
       opportunityRationale: string
@@ -385,7 +385,7 @@ function serializeCached(
       momentumViewsPerDay: video.momentumViewsPerDay,
       momentumGrowthPct: video.momentumGrowthPct,
       momentumSampleHours: video.momentumSampleHours,
-      opportunityScore: video.opportunityScore,
+      opportunityScore: video.opportunityScore ?? 0,
       scoringConfidence: video.scoringConfidence === 'high' || video.scoringConfidence === 'medium'
         ? video.scoringConfidence
         : 'limited',
@@ -559,12 +559,12 @@ async function performMarketSearch(input: YoutubeMarketSearchInput, cacheKey: st
     },
   })
 
-  const videoIds = normalized.map((video) => video.videoId)
-  const previousObservations = videoIds.length > 0
+  const observedVideoIds = normalized.map((video) => video.videoId)
+  const previousObservations = observedVideoIds.length > 0
     ? await db.youtubeMarketVideoObservation.findMany({
         where: {
           queryId: queryRow.id,
-          videoId: { in: videoIds },
+          videoId: { in: observedVideoIds },
           capturedAt: {
             lt: observedAt,
             gte: new Date(observedAt.getTime() - 10 * 24 * 60 * 60 * 1000),
