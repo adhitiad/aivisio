@@ -18,3 +18,27 @@ export function isYoutubeUploadAttemptExhausted(attempt: number, maxAttempts: nu
   if (!Number.isFinite(attempt) || !Number.isFinite(maxAttempts)) return true
   return attempt > Math.max(0, Math.floor(maxAttempts))
 }
+
+export function isYoutubeChannelOwned(channelIds: string[], targetChannelId: string): boolean {
+  return Boolean(targetChannelId) && channelIds.includes(targetChannelId)
+}
+
+export function isYoutubeObjectReady(expectedSize: number, actualSize: number | null): boolean {
+  return Number.isSafeInteger(expectedSize) && expectedSize > 0 &&
+    actualSize !== null && Number.isSafeInteger(actualSize) && actualSize === expectedSize
+}
+
+export function hasYoutubeUploadAttemptsRemaining(attempt: number, maxAttempts: number): boolean {
+  return Number.isSafeInteger(attempt) && Number.isSafeInteger(maxAttempts) &&
+    attempt >= 0 && maxAttempts > 0 && attempt < maxAttempts
+}
+
+export function isYoutubeScheduleValid(
+  scheduledAt: Date | null,
+  now = Date.now(),
+  minimumLeadMs = 10 * 60_000,
+): boolean {
+  if (scheduledAt === null) return true
+  const timestamp = scheduledAt.getTime()
+  return Number.isFinite(timestamp) && timestamp >= now + minimumLeadMs
+}

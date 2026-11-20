@@ -4,7 +4,7 @@ import { getYoutubeAccessToken } from '@/lib/youtube/oauth'
 import { decryptYoutubeToken, encryptYoutubeToken } from '@/lib/youtube/token-crypto'
 import { getObject, headObject } from '@/lib/storage/neon-object-storage'
 import { moduleLogger } from '@/lib/logger'
-import { parseYoutubeUploadOffset, calculateYoutubeRetryDelay, isYoutubeUploadAttemptExhausted } from '@/lib/youtube/publishing-utils'
+import { parseYoutubeUploadOffset, calculateYoutubeRetryDelay, isYoutubeUploadAttemptExhausted, hasYoutubeUploadAttemptsRemaining, isYoutubeScheduleValid } from '@/lib/youtube/publishing-utils'
 
 const log = moduleLogger('youtube-publisher')
 const API = 'https://www.googleapis.com/upload/youtube/v3/videos'
@@ -80,7 +80,7 @@ async function probeSession(uri: string, token: string, total: number): Promise<
   throw await responseError(response)
 }
 
-async function uploadOne(id: string, now = new Date()) {
+async function uploadOne(id: string, now = new Date()): Promise<boolean> {
   const staleBefore = new Date(now.getTime() - LEASE_STALE_MS)
   const claim = await db.youtubePublication.updateMany({
     where: {
@@ -101,11 +101,15 @@ async function uploadOne(id: string, now = new Date()) {
       lastError: null,
     },
   })
-  if (claim.count !== 1) return
+  if (claim.count !== 1) return false
 
   try {
     const item = await db.youtubePublication.findUnique({ where: { id } })
-    if (!item || item.status !== 'uploading' || item.lockedBy !== workerId) return
+    if (!item || item.status !== 'uploading' || item.lockedBy !== workerId) return true
+
+    if (!isYoutubeScheduleValid(item.scheduledAt)) {
+      throw new YoutubeUploadError('Waktu jadwal sudah lewat atau kurang dari 10 menit. Batalkan dan buat publikasi dengan jadwal baru.', false)
+    }
 
     if (isYoutubeUploadAttemptExhausted(item.uploadAttempts, item.maxUploadAttempts)) {
       await db.youtubePublication.updateMany({
@@ -117,7 +121,7 @@ async function uploadOne(id: string, now = new Date()) {
           lockedBy: null,
         },
       })
-      return
+      return true
     }
 
     const [connection, project, channel] = await Promise.all([
@@ -202,7 +206,7 @@ async function uploadOne(id: string, now = new Date()) {
       if (reconciled.count !== 1) throw new Error('Lease publikasi hilang saat rekonsiliasi offset.')
       if (probe.completedId) {
         await markPublished(id, probe.completedId, head.size)
-        return
+        return true
       }
     }
 
@@ -255,14 +259,14 @@ async function uploadOne(id: string, now = new Date()) {
       const result = await response.json().catch(() => null) as UploadResult | null
       if (!result?.id) throw new YoutubeUploadError('Respons final YouTube tidak memiliki video ID.', true)
       await markPublished(id, result.id, head.size)
-      return
+      return true
     }
 
     // A status probe is required before treating a full offset as completed.
     const finalProbe = await probeSession(uri, token, head.size)
     if (finalProbe.completedId) {
       await markPublished(id, finalProbe.completedId, head.size)
-      return
+      return true
     }
     throw new YoutubeUploadError('Seluruh byte telah dikirim tetapi YouTube belum mengonfirmasi video final.', true)
   } catch (error) {
@@ -288,6 +292,7 @@ async function uploadOne(id: string, now = new Date()) {
     })
     log.error({ publicationId: id, retryable, retryAt: shouldRetry ? retryAt.toISOString() : null, err: message }, 'YouTube upload attempt failed')
   }
+  return true
 }
 
 export async function runYoutubePublishingBatch(limit = 3) {
@@ -298,19 +303,32 @@ export async function runYoutubePublishingBatch(limit = 3) {
       approvedAt: { not: null },
       youtubeVideoId: null,
       OR: [
-        { status: 'scheduled', nextAttemptAt: { lte: now }, uploadAttempts: { lt: 8 } },
+        { status: 'scheduled', nextAttemptAt: { lte: now } },
         { status: 'uploading', OR: [{ lockedAt: { lt: staleBefore } }, { lockedAt: null }] },
       ],
     },
     orderBy: [{ nextAttemptAt: 'asc' }, { createdAt: 'asc' }],
-    take: Math.max(1, Math.min(MAX_BATCH, limit)),
-    select: { id: true },
+    take: MAX_BATCH * 10,
+    select: { id: true, status: true, uploadAttempts: true, maxUploadAttempts: true },
   })
 
-  let claimed = 0
+  let attempted = 0
+  const batchLimit = Math.max(1, Math.min(MAX_BATCH, limit))
   for (const row of rows) {
-    await uploadOne(row.id, now)
-    claimed++
+    if (attempted >= batchLimit) break
+    if (!hasYoutubeUploadAttemptsRemaining(row.uploadAttempts, row.maxUploadAttempts)) {
+      await db.youtubePublication.updateMany({
+        where: { id: row.id, status: row.status, uploadAttempts: row.uploadAttempts, youtubeVideoId: null },
+        data: {
+          status: 'failed',
+          lastError: 'Batas maksimum percobaan upload telah tercapai.',
+          lockedAt: null,
+          lockedBy: null,
+        },
+      })
+      continue
+    }
+    if (await uploadOne(row.id, now)) attempted++
   }
-  return { eligible: rows.length, attempted: claimed, completedAt: new Date().toISOString() }
+  return { eligible: rows.length, attempted, completedAt: new Date().toISOString() }
 }

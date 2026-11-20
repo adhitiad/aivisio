@@ -5,8 +5,16 @@ import { db } from '@/lib/db'
 import { getApiSession } from '@/lib/session'
 import { sameOriginGuard } from '@/lib/security/http'
 import { rateLimit } from '@/lib/rate-limit'
+import { getYoutubeAccessToken } from '@/lib/youtube/oauth'
+import { headObject } from '@/lib/storage/neon-object-storage'
+import { isYoutubeChannelOwned, isYoutubeObjectReady, isYoutubeScheduleValid } from '@/lib/youtube/publishing-utils'
 
 const UPLOAD_SCOPE = 'https://www.googleapis.com/auth/youtube.upload'
+const preflightSchema = z.object({
+  action: z.literal('preflight'),
+  channelId: z.string().min(1).max(80),
+  videoProjectId: z.string().min(1).max(80),
+})
 const schema = z.object({
   channelId: z.string().min(1).max(80),
   videoProjectId: z.string().min(1).max(80),
@@ -70,11 +78,79 @@ export const Route = createFileRoute('/api/youtube/publish')({
       if (new TextEncoder().encode(raw).byteLength > 12_000) return Response.json({ error: 'Payload terlalu besar.' }, { status: 413 })
       let body: unknown
       try { body = JSON.parse(raw) } catch { return Response.json({ error: 'Body JSON tidak valid.' }, { status: 400 }) }
+      if (typeof body === 'object' && body !== null && 'action' in body && body.action === 'preflight') {
+        const preflight = preflightSchema.safeParse(body)
+        if (!preflight.success) return Response.json({ error: 'Parameter preflight tidak valid.' }, { status: 400 })
+
+        const [channel, project] = await Promise.all([
+          db.youtubeChannel.findFirst({
+            where: { id: preflight.data.channelId, userId: session.user.id, connectionStatus: 'connected' },
+            include: { oauthConnection: true },
+          }),
+          db.videoProject.findFirst({
+            where: { id: preflight.data.videoProjectId, userId: session.user.id, status: 'done', fileObjectKey: { not: null }, fileBytes: { gt: 0 } },
+            select: { id: true, fileObjectKey: true, fileBytes: true },
+          }),
+        ])
+        if (!channel || !channel.oauthConnection || channel.oauthConnection.connectionStatus !== 'connected') {
+          return Response.json({ ready: false, error: 'Channel YouTube tidak terhubung.' }, { status: 404 })
+        }
+        if (!project?.fileObjectKey || !project.fileBytes) {
+          return Response.json({ ready: false, error: 'Video selesai dan file Object Storage tidak ditemukan.' }, { status: 409 })
+        }
+        if (!channel.oauthConnection.scopes.split(/\s+/).includes(UPLOAD_SCOPE)) {
+          return Response.json({ ready: false, error: 'Izin youtube.upload belum diberikan. Hubungkan ulang akun Google.' }, { status: 403 })
+        }
+
+        try {
+          const accessToken = await getYoutubeAccessToken(channel.oauthConnection)
+          const channelIds: string[] = []
+          let pageToken: string | undefined
+          for (let page = 0; page < 5; page++) {
+            const url = new URL('https://www.googleapis.com/youtube/v3/channels')
+            url.searchParams.set('part', 'id')
+            url.searchParams.set('mine', 'true')
+            url.searchParams.set('maxResults', '50')
+            if (pageToken) url.searchParams.set('pageToken', pageToken)
+            const response = await fetch(url, {
+              headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' },
+              redirect: 'error',
+              cache: 'no-store',
+              signal: AbortSignal.timeout(15_000),
+            })
+            if (!response.ok) {
+              return Response.json({ ready: false, error: response.status === 401 ? 'Token Google perlu dihubungkan ulang.' : 'Google YouTube API gagal memverifikasi channel.' }, { status: response.status === 401 ? 401 : 502 })
+            }
+            const payload = await response.json().catch(() => null) as { items?: Array<{ id?: string }>; nextPageToken?: string } | null
+            channelIds.push(...(payload?.items ?? []).map(item => item.id).filter((id): id is string => Boolean(id)))
+            pageToken = payload?.nextPageToken
+            if (!pageToken) break
+          }
+          if (!isYoutubeChannelOwned(channelIds, channel.youtubeChannelId)) {
+            return Response.json({ ready: false, error: 'Channel yang dipilih tidak ditemukan pada akun Google yang terhubung.' }, { status: 409 })
+          }
+
+          const object = await headObject(project.fileObjectKey, 30_000)
+          if (!isYoutubeObjectReady(project.fileBytes, object?.size ?? null)) {
+            return Response.json({ ready: false, error: 'Ukuran file Object Storage tidak cocok dengan data proyek.' }, { status: 409 })
+          }
+
+          return Response.json({
+            ready: true,
+            checks: { oauthToken: 'ok', uploadScope: 'ok', channelOwnership: 'ok', objectStorage: 'ok' },
+            message: 'Prasyarat upload YouTube tervalidasi. Belum ada video yang diunggah.',
+          }, { headers: { 'Cache-Control': 'private, no-store' } })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Preflight gagal.'
+          return Response.json({ ready: false, error: message.slice(0, 250) }, { status: 502 })
+        }
+      }
+
       const parsed = schema.safeParse(body)
       if (!parsed.success) return Response.json({ error: 'Metadata publikasi tidak valid.', issues: parsed.error.flatten() }, { status: 400 })
 
       const input = parsed.data
-      if (input.scheduledAt && (new Date(input.scheduledAt).getTime() < Date.now() + 10 * 60_000 || input.privacyStatus !== 'private')) {
+      if (input.scheduledAt && (!isYoutubeScheduleValid(new Date(input.scheduledAt)) || input.privacyStatus !== 'private')) {
         return Response.json({ error: 'Jadwal minimal 10 menit ke depan dan hanya mendukung privacy private.' }, { status: 400 })
       }
 
@@ -141,11 +217,20 @@ export const Route = createFileRoute('/api/youtube/publish')({
       }
 
       if (body.action === 'approve') {
+        const pending = await db.youtubePublication.findFirst({
+          where: { id: body.id, userId: session.user.id, status: 'pending_approval', approvedAt: null },
+          select: { scheduledAt: true },
+        })
+        if (!pending) return Response.json({ error: 'Publikasi tidak ditemukan atau sudah diproses.' }, { status: 409 })
+        const approvedAt = new Date()
+        if (!isYoutubeScheduleValid(pending.scheduledAt, approvedAt.getTime())) {
+          return Response.json({ error: 'Waktu jadwal sudah lewat atau kurang dari 10 menit. Batalkan publikasi ini dan buat jadwal baru.' }, { status: 409 })
+        }
         const result = await db.youtubePublication.updateMany({
           where: { id: body.id, userId: session.user.id, status: 'pending_approval', approvedAt: null },
-          data: { status: 'scheduled', approvedAt: new Date(), approvedBy: session.user.id, nextAttemptAt: new Date() },
+          data: { status: 'scheduled', approvedAt, approvedBy: session.user.id, nextAttemptAt: approvedAt },
         })
-        return result.count ? Response.json({ success: true, status: 'scheduled' }) : Response.json({ error: 'Publikasi tidak ditemukan atau sudah diproses.' }, { status: 409 })
+        return result.count ? Response.json({ success: true, status: 'scheduled' }) : Response.json({ error: 'Publikasi sudah diproses oleh permintaan lain.' }, { status: 409 })
       }
 
       if (body.action === 'retry') {

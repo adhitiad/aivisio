@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { calculateYoutubeRetryDelay, isYoutubeUploadAttemptExhausted, parseYoutubeUploadOffset } from './publishing-utils'
+import { calculateYoutubeRetryDelay, hasYoutubeUploadAttemptsRemaining, isYoutubeChannelOwned, isYoutubeObjectReady, isYoutubeUploadAttemptExhausted, isYoutubeScheduleValid, parseYoutubeUploadOffset } from './publishing-utils'
 
 function expectThrows(callback: () => unknown) {
   let didThrow = false
@@ -32,5 +32,37 @@ describe('isYoutubeUploadAttemptExhausted', () => {
   test('stops after the configured maximum and rejects invalid counters', () => {
     expect(isYoutubeUploadAttemptExhausted(9, 8)).toBe(true)
     expect(isYoutubeUploadAttemptExhausted(Number.NaN, 8)).toBe(true)
+  })
+})
+
+describe('YouTube publishing preflight', () => {
+  test('requires the selected channel to belong to the connected Google account', () => {
+    expect(isYoutubeChannelOwned(['UC123', 'UC456'], 'UC123')).toBe(true)
+    expect(isYoutubeChannelOwned(['UC123'], 'UC999')).toBe(false)
+    expect(isYoutubeChannelOwned([], 'UC123')).toBe(false)
+  })
+
+  test('requires a positive exact object size match', () => {
+    expect(isYoutubeObjectReady(1024, 1024)).toBe(true)
+    expect(isYoutubeObjectReady(1024, 1023)).toBe(false)
+    expect(isYoutubeObjectReady(0, 0)).toBe(false)
+    expect(isYoutubeObjectReady(1024, null)).toBe(false)
+  })
+
+  test('respects the configured retry budget', () => {
+    expect(hasYoutubeUploadAttemptsRemaining(0, 8)).toBe(true)
+    expect(hasYoutubeUploadAttemptsRemaining(7, 8)).toBe(true)
+    expect(hasYoutubeUploadAttemptsRemaining(8, 8)).toBe(false)
+    expect(hasYoutubeUploadAttemptsRemaining(0, 0)).toBe(false)
+  })
+})
+
+describe('YouTube scheduled publishing', () => {
+  test('requires the scheduled time to remain at least ten minutes ahead', () => {
+    const now = Date.now()
+    expect(isYoutubeScheduleValid(null, now)).toBe(true)
+    expect(isYoutubeScheduleValid(new Date(now + 11 * 60_000), now)).toBe(true)
+    expect(isYoutubeScheduleValid(new Date(now + 9 * 60_000), now)).toBe(false)
+    expect(isYoutubeScheduleValid(new Date(now - 1), now)).toBe(false)
   })
 })
