@@ -297,7 +297,7 @@ async function processScene(ctx: PipelineCtx, scene: SceneState, agentId: number
   }
 }
 
-async function runVideoPipeline(id: string) {
+export async function runVideoPipeline(id: string) {
   const project = await db.videoProject.findUnique({ where: { id } })
   if (!project) return
 
@@ -480,6 +480,7 @@ async function runVideoPipeline(id: string) {
     await db.videoProject
       .update({ where: { id }, data: { status: 'error', error: msg.slice(0, 500) } })
       .catch(() => {})
+    throw err
   }
 }
 
