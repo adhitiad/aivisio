@@ -10,7 +10,12 @@ export const logger = pino({
   base: { app: 'aiviso' },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
-    paths: ['apiKey', '*.apiKey', 'req.headers.authorization', 'config.apiKey'],
+    paths: [
+      'apiKey', '*.apiKey', 'req.headers.authorization', '*.authorization',
+      '*.accessToken', '*.refreshToken', '*.idToken', '*.clientSecret',
+      '*.uploadSessionUriEncrypted', '*.sessionUri', '*.token',
+      'config.apiKey',
+    ],
     censor: '[REDACTED]',
   },
 })

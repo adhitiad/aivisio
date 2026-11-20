@@ -48,6 +48,7 @@ async function markPublished(id: string, youtubeVideoId: string, total: number) 
     },
   })
   if (result.count !== 1) throw new Error('Lease publikasi hilang sebelum status tersimpan.')
+  log.info({ publicationId: id, youtubeVideoId, totalBytes: total, workerId }, 'YouTube upload completed')
 }
 
 async function probeSession(uri: string, token: string, total: number): Promise<{ offset: number; completedId?: string }> {
@@ -102,6 +103,7 @@ async function uploadOne(id: string, now = new Date()): Promise<boolean> {
     },
   })
   if (claim.count !== 1) return false
+  log.info({ publicationId: id, workerId, leaseRecovered: true }, 'YouTube publication lease claimed')
 
   try {
     const item = await db.youtubePublication.findUnique({ where: { id } })
@@ -290,7 +292,7 @@ async function uploadOne(id: string, now = new Date()): Promise<boolean> {
         lockedBy: null,
       },
     })
-    log.error({ publicationId: id, retryable, retryAt: shouldRetry ? retryAt.toISOString() : null, err: message }, 'YouTube upload attempt failed')
+    log.error({ publicationId: id, workerId, retryable, attempt: current?.uploadAttempts ?? null, maxAttempts: current?.maxUploadAttempts ?? null, retryAt: shouldRetry ? retryAt.toISOString() : null, err: message }, 'YouTube upload attempt failed')
   }
   return true
 }
@@ -314,6 +316,7 @@ export async function runYoutubePublishingBatch(limit = 3) {
 
   let attempted = 0
   const batchLimit = Math.max(1, Math.min(MAX_BATCH, limit))
+  log.info({ workerId, eligible: rows.length, batchLimit, staleLeaseCandidates: rows.filter(row => row.status === 'uploading').length }, 'YouTube publishing batch started')
   for (const row of rows) {
     if (attempted >= batchLimit) break
     if (!hasYoutubeUploadAttemptsRemaining(row.uploadAttempts, row.maxUploadAttempts)) {
@@ -330,5 +333,7 @@ export async function runYoutubePublishingBatch(limit = 3) {
     }
     if (await uploadOne(row.id, now)) attempted++
   }
-  return { eligible: rows.length, attempted, completedAt: new Date().toISOString() }
+  const result = { eligible: rows.length, attempted, completedAt: new Date().toISOString(), workerId }
+  log.info({ ...result, durationMs: Date.now() - now.getTime() }, 'YouTube publishing batch completed')
+  return result
 }
