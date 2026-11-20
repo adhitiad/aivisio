@@ -454,3 +454,17 @@ placeholder responses, or unimplemented prompts.
 
 The final product must be a functioning
 YouTube Creator Growth & Revenue Studio.
+
+Prioritas	Fitur
+P0	Neon Object Storage + migrasi seluruh media
+P0	Redis abstraction: Local, Upstash, Redis Cloud
+P1	Niche Profile & Strategy Engine
+P1	Revenue Optimization Engine
+P1	Niche Commercial Intelligence
+P1	Competitor & Topic Opportunity Engine
+P1	Retention Engineering
+P1	Hybrid Video Editing & Rights Validation
+P1	Thumbnail & Title Experiment Engine
+P1	Affiliate & Product Revenue Engine
+P2	Sponsorship & Brand Deal Intelligence
+P2	Revenue Forecasting dan Continuous Learning
