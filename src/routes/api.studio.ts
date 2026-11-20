@@ -215,6 +215,7 @@ export const Route = createFileRoute('/api/studio')({
           if (!project) return Response.json({ error: 'Thumbnail hanya tersedia untuk video selesai milik akun ini.' }, { status: 404 })
           const count = await db.thumbnailVariant.count({ where: { userId: session.user.id, videoProjectId: project.id } })
           if (count >= 12) return Response.json({ error: 'Maksimal 12 variasi thumbnail per project.' }, { status: 409 })
+          let generatedImagePath: string | null = null
           try {
             const prompt = [
               'Create a professional high-click-through-rate YouTube thumbnail, landscape 16:9.',
@@ -234,12 +235,14 @@ export const Route = createFileRoute('/api/studio')({
             const id = randomUUID()
             const imagePath = path.join(directory, id + '.png')
             await fs.writeFile(imagePath, image, { flag: 'wx' })
+            generatedImagePath = imagePath
             const variant = await db.thumbnailVariant.create({
               data: { id, userId: session.user.id, videoProjectId: project.id, prompt: parsed.data.prompt, aspect: '16:9', imagePath, provider: 'z-ai' },
               select: { id: true, prompt: true, aspect: true, isSelected: true, createdAt: true },
             })
             return Response.json({ variant: { ...variant, previewUrl: '/api/studio?resource=thumbnails&file=' + id } }, { status: 201 })
           } catch (error) {
+            if (generatedImagePath) await fs.rm(generatedImagePath, { force: true }).catch(() => {})
             log.error({ err: error instanceof Error ? error.message.slice(0, 180) : 'unknown' }, 'thumbnail generation failed')
             return Response.json({ error: 'Gagal membuat thumbnail. Periksa konfigurasi provider AI.' }, { status: 502 })
           }
