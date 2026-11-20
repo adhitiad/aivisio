@@ -50,6 +50,8 @@ import { Route as ApiYoutubeAnalyticsRouteImport } from './routes/api.youtube.an
 import { Route as ApiYoutubeDisconnectRouteImport } from './routes/api.youtube.disconnect'
 import { Route as ApiYoutubeMarketTopicsRouteImport } from './routes/api.youtube.market.topics'
 import { Route as ApiYoutubeSchedulerRouteImport } from './routes/api.youtube.scheduler'
+import { Route as ApiStudioRouteImport } from './routes/api.studio'
+import { Route as ProtectedDashboardStudioRouteImport } from './routes/_protected.dashboard.studio'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -200,6 +202,11 @@ const ApiYoutubeSchedulerRoute = ApiYoutubeSchedulerRouteImport.update({
   path: '/youtube/scheduler',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiStudioRoute = ApiStudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ProtectedDashboardHistoryRoute =
   ProtectedDashboardHistoryRouteImport.update({
     id: '/history',
@@ -238,6 +245,11 @@ const ProtectedDashboardResearchRoute = ProtectedDashboardResearchRouteImport.up
 const ProtectedDashboardAnalyticsRoute = ProtectedDashboardAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => ProtectedDashboardRoute,
+} as any)
+const ProtectedDashboardStudioRoute = ProtectedDashboardStudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
   getParentRoute: () => ProtectedDashboardRoute,
 } as any)
 const ApiAiProvidersTestRoute = ApiAiProvidersTestRouteImport.update({
@@ -290,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
   '/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
+  '/dashboard/studio': typeof ProtectedDashboardStudioRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -302,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
   '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
   '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
+  '/api/studio': typeof ApiStudioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -332,6 +346,7 @@ export interface FileRoutesByTo {
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
   '/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
+  '/dashboard/studio': typeof ProtectedDashboardStudioRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -344,6 +359,7 @@ export interface FileRoutesByTo {
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
   '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
   '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
+  '/api/studio': typeof ApiStudioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -376,6 +392,7 @@ export interface FileRoutesById {
   '/_protected/dashboard/videos': typeof ProtectedDashboardVideosRoute
   '/_protected/dashboard/research': typeof ProtectedDashboardResearchRoute
   '/_protected/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
+  '/_protected/dashboard/studio': typeof ProtectedDashboardStudioRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
@@ -388,6 +405,7 @@ export interface FileRoutesById {
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
   '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
   '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
+  '/api/studio': typeof ApiStudioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -420,6 +438,7 @@ export interface FileRouteTypes {
     | '/dashboard/videos'
     | '/dashboard/research'
     | '/dashboard/analytics'
+    | '/dashboard/studio'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -432,6 +451,7 @@ export interface FileRouteTypes {
     | '/api/youtube/disconnect'
     | '/api/youtube/market/topics'
     | '/api/youtube/scheduler'
+    | '/api/studio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -462,6 +482,7 @@ export interface FileRouteTypes {
     | '/dashboard/videos'
     | '/dashboard/research'
     | '/dashboard/analytics'
+    | '/dashboard/studio'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -474,6 +495,7 @@ export interface FileRouteTypes {
     | '/api/youtube/disconnect'
     | '/api/youtube/market/topics'
     | '/api/youtube/scheduler'
+    | '/api/studio'
   id:
     | '__root__'
     | '/'
@@ -505,6 +527,7 @@ export interface FileRouteTypes {
     | '/_protected/dashboard/videos'
     | '/_protected/dashboard/research'
     | '/_protected/dashboard/analytics'
+    | '/_protected/dashboard/studio'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
@@ -517,6 +540,7 @@ export interface FileRouteTypes {
     | '/api/youtube/disconnect'
     | '/api/youtube/market/topics'
     | '/api/youtube/scheduler'
+    | '/api/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -738,6 +762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedDashboardAnalyticsRouteImport
       parentRoute: typeof ProtectedDashboardRoute
     }
+    '/_protected/dashboard/studio': {
+      id: '/_protected/dashboard/studio'
+      path: '/studio'
+      fullPath: '/dashboard/studio'
+      preLoaderRoute: typeof ProtectedDashboardStudioRouteImport
+      parentRoute: typeof ProtectedDashboardRoute
+    }
     '/api/ai-providers/test': {
       id: '/api/ai-providers/test'
       path: '/test'
@@ -815,6 +846,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoutubeMarketTopicsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/studio': {
+      id: '/api/studio'
+      path: '/studio'
+      fullPath: '/api/studio'
+      preLoaderRoute: typeof ApiStudioRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/youtube/scheduler': {
       id: '/api/youtube/scheduler'
       path: '/youtube/scheduler'
@@ -826,6 +864,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ProtectedDashboardRouteChildren {
+  ProtectedDashboardStudioRoute: typeof ProtectedDashboardStudioRoute
   ProtectedDashboardHistoryRoute: typeof ProtectedDashboardHistoryRoute
   ProtectedDashboardMessagesRoute: typeof ProtectedDashboardMessagesRoute
   ProtectedDashboardProvidersRoute: typeof ProtectedDashboardProvidersRoute
@@ -836,6 +875,7 @@ interface ProtectedDashboardRouteChildren {
 }
 
 const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
+  ProtectedDashboardStudioRoute: ProtectedDashboardStudioRoute,
   ProtectedDashboardHistoryRoute: ProtectedDashboardHistoryRoute,
   ProtectedDashboardMessagesRoute: ProtectedDashboardMessagesRoute,
   ProtectedDashboardProvidersRoute: ProtectedDashboardProvidersRoute,
@@ -896,6 +936,7 @@ const ApiVideoRouteWithChildren = ApiVideoRoute._addFileChildren(
 )
 
 interface ApiRouteChildren {
+  ApiStudioRoute: typeof ApiStudioRoute
   ApiAiProvidersRoute: typeof ApiAiProvidersRouteWithChildren
   ApiContactRoute: typeof ApiContactRoute
   ApiGenerateRoute: typeof ApiGenerateRoute
@@ -918,6 +959,7 @@ interface ApiRouteChildren {
 }
 
 const ApiRouteChildren: ApiRouteChildren = {
+  ApiStudioRoute: ApiStudioRoute,
   ApiAiProvidersRoute: ApiAiProvidersRouteWithChildren,
   ApiContactRoute: ApiContactRoute,
   ApiGenerateRoute: ApiGenerateRoute,
