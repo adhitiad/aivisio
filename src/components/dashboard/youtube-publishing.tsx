@@ -55,6 +55,8 @@ export function YoutubePublishingDashboard() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [preflightBusy, setPreflightBusy] = useState(false)
+  const [preflightResult, setPreflightResult] = useState<{ ready: boolean; message: string } | null>(null)
   const [channelId, setChannelId] = useState("")
   const [videoProjectId, setVideoProjectId] = useState("")
   const [title, setTitle] = useState("")
@@ -90,6 +92,29 @@ export function YoutubePublishingDashboard() {
     published: data.items.filter(x => x.status === "published").length,
     failed: data.items.filter(x => x.status === "failed").length,
   }), [data.items])
+
+  async function runPreflight() {
+    if (!channelId || !videoProjectId) return
+    setPreflightBusy(true)
+    setPreflightResult(null)
+    try {
+      const response = await fetch("/api/youtube/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preflight", channelId, videoProjectId }),
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload.ready) throw new Error(payload.error || "Preflight YouTube gagal.")
+      setPreflightResult({ ready: true, message: payload.message || "Semua prasyarat upload terpenuhi." })
+      toast({ title: "Kesiapan upload tervalidasi", description: "Token, izin, channel, dan file siap. Belum ada video yang diunggah." })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Preflight YouTube gagal."
+      setPreflightResult({ ready: false, message })
+      toast({ title: message, variant: "destructive" })
+    } finally {
+      setPreflightBusy(false)
+    }
+  }
 
   async function createPublication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -168,14 +193,14 @@ export function YoutubePublishingDashboard() {
           ) : (
             <form onSubmit={createPublication} className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1.5 text-sm">Channel
-                <select required value={channelId} onChange={e => setChannelId(e.target.value)} className="h-10 rounded-md border bg-background px-3">
+                <select required value={channelId} onChange={e => { setChannelId(e.target.value); setPreflightResult(null) }} className="h-10 rounded-md border bg-background px-3">
                   <option value="">Pilih channel</option>
                   {data.channels.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
                 </select>
               </label>
               <label className="grid gap-1.5 text-sm">Video siap terbit
                 <select required value={videoProjectId} onChange={e => {
-                  const value = e.target.value; setVideoProjectId(value)
+                  const value = e.target.value; setVideoProjectId(value); setPreflightResult(null)
                   const project = data.projects.find(x => x.id === value)
                   if (project && !title) setTitle(project.title || project.topic)
                 }} className="h-10 rounded-md border bg-background px-3">
@@ -201,11 +226,24 @@ export function YoutubePublishingDashboard() {
                 <Input type="datetime-local" value={scheduledAt} onChange={e => { setScheduledAt(e.target.value); if (e.target.value) setPrivacyStatus("private") }} />
                 <span className="text-xs text-muted-foreground">Jadwal minimal 10 menit ke depan. Video akan diunggah sebagai private.</span>
               </label>
-              <div className="flex flex-col justify-between gap-3 border-t pt-4 md:col-span-2 sm:flex-row sm:items-center">
-                <p className="text-xs text-muted-foreground">{selectedProject ? "Ukuran video: " + formatBytes(selectedProject.fileBytes) : "Pilih video yang akan dipublikasikan."}</p>
-                <Button type="submit" disabled={creating || !channelId || !videoProjectId || !title.trim()}>
-                  <UploadCloud className="mr-2 h-4 w-4" /> {creating ? "Membuat..." : "Buat publikasi"}
-                </Button>
+              <div className="flex flex-col gap-3 border-t pt-4 md:col-span-2">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <p className="text-xs text-muted-foreground">{selectedProject ? "Ukuran video: " + formatBytes(selectedProject.fileBytes) : "Pilih video yang akan dipublikasikan."}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={() => void runPreflight()} disabled={preflightBusy || creating || !channelId || !videoProjectId}>
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> {preflightBusy ? "Memeriksa..." : "Periksa kesiapan"}
+                    </Button>
+                    <Button type="submit" disabled={creating || preflightBusy || !channelId || !videoProjectId || !title.trim()}>
+                      <UploadCloud className="mr-2 h-4 w-4" /> {creating ? "Membuat..." : "Buat publikasi"}
+                    </Button>
+                  </div>
+                </div>
+                {preflightResult && <div className={preflightResult.ready ? "rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300" : "rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"}>
+                  <div className="flex items-start gap-2">
+                    {preflightResult.ready ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
+                    <span>{preflightResult.message}</span>
+                  </div>
+                </div>}
               </div>
             </form>
           )}
