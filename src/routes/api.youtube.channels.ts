@@ -24,6 +24,8 @@ export const Route = createFileRoute('/api/youtube/channels')({
                 country: true,
                 connectionStatus: true,
                 lastSyncedAt: true,
+                lastAnalyticsSyncedAt: true,
+                analyticsSyncError: true,
               },
             },
           },

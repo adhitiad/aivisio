@@ -28,6 +28,7 @@ model User {
   youtubeChannels YoutubeChannel[]
   youtubeOAuthConnection YoutubeOAuthConnection?
   youtubeOAuthStates YoutubeOAuthState[]
+  trackedMarketTopics YoutubeTrackedMarketTopic[]
   notifications Notification[]
   notificationReadReceipts NotificationReadReceipt[]
   createdAt     DateTime       @default(now())
@@ -165,6 +166,8 @@ model YoutubeChannel {
   monthlyBudget     Int?
   connectionStatus  String                  @default("connected") // connected | needs_reconnect | disconnected
   lastSyncedAt      DateTime?
+  lastAnalyticsSyncedAt DateTime?
+  analyticsSyncError String?
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   account           Account?                @relation(fields: [accountId], references: [id], onDelete: SetNull)
   oauthConnection   YoutubeOAuthConnection? @relation(fields: [oauthConnectionId], references: [id], onDelete: SetNull)
@@ -180,6 +183,7 @@ model YoutubeChannel {
   @@index([accountId])
   @@index([oauthConnectionId])
   @@index([connectionStatus])
+  @@index([lastAnalyticsSyncedAt])
 }
 
 model YoutubeGoal {
@@ -349,6 +353,9 @@ model YoutubeMarketQuery {
   observedAt   DateTime            @default(now())
   expiresAt    DateTime
   videos       YoutubeMarketVideo[]
+  observations YoutubeMarketVideoObservation[]
+  trackedTopics YoutubeTrackedMarketTopic[]
+  opportunityScores YoutubeOpportunityScoreSnapshot[]
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
@@ -373,6 +380,14 @@ model YoutubeMarketVideo {
   viewsPerDay     Float              @default(0)
   engagementRate  Float              @default(0)
   velocityIndex   Float              @default(0)
+  momentumViewsPerDay Float?
+  momentumGrowthPct Float?
+  momentumSampleHours Float?
+  opportunityScore Float?
+  scoringConfidence String?
+  scoringComponents String @default("{}")
+  opportunityRationale String @default("[]")
+  momentumObservationCount Int @default(0)
   thumbnailUrl    String?
   videoUrl        String
   query           YoutubeMarketQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
@@ -442,6 +457,10 @@ model YoutubeAnalyticsDailyMetric {
   views                   BigInt         @default(0)
   estimatedMinutesWatched Float          @default(0)
   averageViewDuration     Float          @default(0)
+  averageViewPercentage   Float          @default(0)
+  likes                   BigInt         @default(0)
+  comments                BigInt         @default(0)
+  shares                  BigInt         @default(0)
   subscribersGained       Int            @default(0)
   subscribersLost         Int            @default(0)
   estimatedRevenue        Float?
@@ -454,4 +473,83 @@ model YoutubeAnalyticsDailyMetric {
   @@unique([channelId, metricDate])
   @@index([channelId, metricDate])
   @@index([metricDate])
+}
+
+
+// Creator-owned public market queries to monitor on a recurring schedule.
+model YoutubeTrackedMarketTopic {
+  id            String              @id @default(uuid(7))
+  userId        String
+  queryId       String?
+  query         String
+  market        String
+  order         String              @default("relevance")
+  periodDays    Int                 @default(90)
+  maxResults    Int                 @default(50)
+  active        Boolean             @default(true)
+  lastSnapshotAt DateTime?
+  nextRunAt     DateTime            @default(now())
+  lastError     String?
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketQuery   YoutubeMarketQuery? @relation(fields: [queryId], references: [id], onDelete: SetNull)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([userId, query, market])
+  @@index([userId, active])
+  @@index([active, nextRunAt])
+  @@index([queryId])
+}
+
+// Immutable public-stat observations. Never overwrite earlier measurements.
+model YoutubeMarketVideoObservation {
+  id              String             @id @default(uuid(7))
+  queryId         String
+  videoId         String
+  channelId       String
+  channelTitle    String
+  title           String
+  publishedAt     DateTime?
+  viewCount       BigInt             @default(0)
+  likeCount       BigInt             @default(0)
+  commentCount    BigInt             @default(0)
+  subscriberCount BigInt?
+  viewsPerDay     Float              @default(0)
+  engagementRate  Float              @default(0)
+  velocityIndex   Float              @default(0)
+  capturedAt      DateTime           @default(now())
+  query           YoutubeMarketQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([queryId, videoId, capturedAt])
+  @@index([queryId, capturedAt])
+  @@index([videoId, capturedAt])
+  @@index([channelId, capturedAt])
+}
+
+// Versioned, explainable opportunity scoring snapshots for public market videos.
+model YoutubeOpportunityScoreSnapshot {
+  id              String             @id @default(uuid(7))
+  queryId         String
+  videoId         String
+  score           Float
+  confidence      String             @default("limited") // high | medium | limited
+  algorithmVersion String            @default("v1")
+  momentumScore   Float
+  demandScore     Float
+  engagementScore Float
+  competitionScore Float
+  freshnessScore Float
+  components      String              @default("{}")
+  rationale       String              @default("[]")
+  capturedAt      DateTime            @default(now())
+  query           YoutubeMarketQuery  @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([queryId, videoId, capturedAt])
+  @@index([queryId, score])
+  @@index([videoId, capturedAt])
+  @@index([capturedAt])
 }

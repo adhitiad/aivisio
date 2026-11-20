@@ -48,6 +48,8 @@ import { Route as ApiYoutubeOauthCallbackRouteImport } from './routes/api.youtub
 import { Route as ApiYoutubeChannelsRouteImport } from './routes/api.youtube.channels'
 import { Route as ApiYoutubeAnalyticsRouteImport } from './routes/api.youtube.analytics'
 import { Route as ApiYoutubeDisconnectRouteImport } from './routes/api.youtube.disconnect'
+import { Route as ApiYoutubeMarketTopicsRouteImport } from './routes/api.youtube.market.topics'
+import { Route as ApiYoutubeSchedulerRouteImport } from './routes/api.youtube.scheduler'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -188,6 +190,16 @@ const ApiYoutubeDisconnectRoute = ApiYoutubeDisconnectRouteImport.update({
   path: '/youtube/disconnect',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiYoutubeMarketTopicsRoute = ApiYoutubeMarketTopicsRouteImport.update({
+  id: '/youtube/market/topics',
+  path: '/youtube/market/topics',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeSchedulerRoute = ApiYoutubeSchedulerRouteImport.update({
+  id: '/youtube/scheduler',
+  path: '/youtube/scheduler',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ProtectedDashboardHistoryRoute =
   ProtectedDashboardHistoryRouteImport.update({
     id: '/history',
@@ -288,6 +300,8 @@ export interface FileRoutesByFullPath {
   '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
   '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
+  '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
+  '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -328,6 +342,8 @@ export interface FileRoutesByTo {
   '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
   '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
+  '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
+  '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -370,6 +386,8 @@ export interface FileRoutesById {
   '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
   '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
   '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
+  '/api/youtube/scheduler': typeof ApiYoutubeSchedulerRoute
+  '/api/youtube/market/topics': typeof ApiYoutubeMarketTopicsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -412,6 +430,8 @@ export interface FileRouteTypes {
     | '/api/youtube/channels'
     | '/api/youtube/analytics'
     | '/api/youtube/disconnect'
+    | '/api/youtube/market/topics'
+    | '/api/youtube/scheduler'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -452,6 +472,8 @@ export interface FileRouteTypes {
     | '/api/youtube/channels'
     | '/api/youtube/analytics'
     | '/api/youtube/disconnect'
+    | '/api/youtube/market/topics'
+    | '/api/youtube/scheduler'
   id:
     | '__root__'
     | '/'
@@ -493,6 +515,8 @@ export interface FileRouteTypes {
     | '/api/youtube/channels'
     | '/api/youtube/analytics'
     | '/api/youtube/disconnect'
+    | '/api/youtube/market/topics'
+    | '/api/youtube/scheduler'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -784,6 +808,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiYoutubeDisconnectRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/youtube/market/topics': {
+      id: '/api/youtube/market/topics'
+      path: '/youtube/market/topics'
+      fullPath: '/api/youtube/market/topics'
+      preLoaderRoute: typeof ApiYoutubeMarketTopicsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/scheduler': {
+      id: '/api/youtube/scheduler'
+      path: '/youtube/scheduler'
+      fullPath: '/api/youtube/scheduler'
+      preLoaderRoute: typeof ApiYoutubeSchedulerRouteImport
+      parentRoute: typeof ApiRoute
+    }
   }
 }
 
@@ -874,6 +912,8 @@ interface ApiRouteChildren {
   ApiYoutubeChannelsRoute: typeof ApiYoutubeChannelsRoute
   ApiYoutubeAnalyticsRoute: typeof ApiYoutubeAnalyticsRoute
   ApiYoutubeDisconnectRoute: typeof ApiYoutubeDisconnectRoute
+  ApiYoutubeMarketTopicsRoute: typeof ApiYoutubeMarketTopicsRoute
+  ApiYoutubeSchedulerRoute: typeof ApiYoutubeSchedulerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -894,6 +934,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiYoutubeChannelsRoute: ApiYoutubeChannelsRoute,
   ApiYoutubeAnalyticsRoute: ApiYoutubeAnalyticsRoute,
   ApiYoutubeDisconnectRoute: ApiYoutubeDisconnectRoute,
+  ApiYoutubeMarketTopicsRoute: ApiYoutubeMarketTopicsRoute,
+  ApiYoutubeSchedulerRoute: ApiYoutubeSchedulerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 

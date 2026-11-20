@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useT } from '@/lib/i18n'
 
 type MarketCode = 'ID' | 'MY' | 'SG' | 'PH' | 'TH' | 'VN' | 'BN' | 'KH' | 'LA' | 'MM'
@@ -16,6 +16,14 @@ type MarketVideo = {
   viewsPerDay: number
   engagementRate: number
   velocityIndex: number
+  momentumViewsPerDay: number | null
+  momentumGrowthPct: number | null
+  momentumSampleHours: number | null
+  opportunityScore: number
+  scoringConfidence: 'high' | 'medium' | 'limited'
+  scoringComponents: Record<string, { score: number; available: boolean; weight: number; rationale: string }>
+  opportunityRationale: string[]
+  momentumObservationCount: number
   thumbnailUrl: string | null
   videoUrl: string
 }
@@ -28,6 +36,19 @@ type MarketResult = {
   fromCache: boolean
   videos: MarketVideo[]
   dataLimitations: string[]
+}
+
+type TrackedTopic = {
+  id: string
+  query: string
+  market: MarketCode
+  order: Order
+  periodDays: number
+  maxResults: number
+  active: boolean
+  lastSnapshotAt: string | null
+  nextRunAt: string
+  lastError: string | null
 }
 
 const MARKETS: MarketCode[] = ['ID', 'MY', 'SG', 'PH', 'TH', 'VN', 'BN', 'KH', 'LA', 'MM']
@@ -66,6 +87,58 @@ export function YoutubeMarketResearch() {
   const [result, setResult] = useState<MarketResult | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [trackedTopics, setTrackedTopics] = useState<TrackedTopic[]>([])
+  const [trackingBusy, setTrackingBusy] = useState(false)
+  const [trackingError, setTrackingError] = useState('')
+
+  async function loadTrackedTopics() {
+    try {
+      const response = await fetch('/api/youtube/market/topics', { cache: 'no-store' })
+      const payload = await response.json().catch(() => null)
+      if (response.ok) setTrackedTopics((payload?.topics ?? []) as TrackedTopic[])
+    } catch {
+      setTrackingError(label('trackingLoadFailed'))
+    }
+  }
+
+  useEffect(() => {
+    void loadTrackedTopics()
+  }, [])
+
+  async function saveTrackedTopic() {
+    setTrackingBusy(true)
+    setTrackingError('')
+    try {
+      const response = await fetch('/api/youtube/market/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, market, order, periodDays, maxResults }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || label('trackingSaveFailed'))
+      await loadTrackedTopics()
+    } catch (err) {
+      setTrackingError(err instanceof Error ? err.message : label('trackingSaveFailed'))
+    } finally {
+      setTrackingBusy(false)
+    }
+  }
+
+  async function removeTrackedTopic(id: string) {
+    setTrackingError('')
+    try {
+      const response = await fetch('/api/youtube/market/topics', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || label('trackingDeleteFailed'))
+      setTrackedTopics((current) => current.filter((topic) => topic.id !== id))
+    } catch (err) {
+      setTrackingError(err instanceof Error ? err.message : label('trackingDeleteFailed'))
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -174,7 +247,7 @@ export function YoutubeMarketResearch() {
           </select>
         </label>
 
-        <div className="flex items-end xl:col-span-5">
+        <div className="flex flex-wrap items-end gap-2 xl:col-span-5">
           <button
             type="submit"
             disabled={loading || query.trim().length < 2}
@@ -182,8 +255,60 @@ export function YoutubeMarketResearch() {
           >
             {loading ? label('searching') : label('search')}
           </button>
+          <button
+            type="button"
+            onClick={saveTrackedTopic}
+            disabled={trackingBusy || query.trim().length < 2}
+            className="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {trackingBusy ? label('trackingSaving') : label('trackTopic')}
+          </button>
         </div>
       </form>
+
+      {trackingError ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {trackingError}
+        </div>
+      ) : null}
+
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-semibold">{label('trackingTitle')}</h2>
+            <p className="text-xs text-muted-foreground">{label('trackingDescription')}</p>
+          </div>
+          <span className="rounded-full border border-border px-3 py-1 text-xs tabular-nums">
+            {trackedTopics.length}/5
+          </span>
+        </div>
+        {trackedTopics.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{label('trackingEmpty')}</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {trackedTopics.map((topic) => (
+              <div key={topic.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium">{topic.query} · {label('markets.' + topic.market)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {label('lastSnapshot')}: {formatDate(topic.lastSnapshotAt)} · {label('nextSnapshot')}: {formatDate(topic.nextRunAt)}
+                  </p>
+                  {topic.lastError ? (
+                    <p className="mt-1 text-xs text-destructive">{topic.lastError}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeTrackedTopic(topic.id)}
+                  className="h-8 rounded-md border border-border px-3 text-xs font-medium hover:bg-muted"
+                >
+                  {label('stopTracking')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {error ? (
         <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
@@ -215,13 +340,14 @@ export function YoutubeMarketResearch() {
             </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[850px] text-left text-sm">
+              <table className="w-full min-w-[1080px] text-left text-sm">
                 <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-3 py-3">Video</th>
                     <th className="px-3 py-3">{label('views')}</th>
                     <th className="px-3 py-3">{label('viewsPerDay')}</th>
-                    <th className="px-3 py-3">{label('velocity')}</th>
+                    <th className="px-3 py-3">{label('observedMomentum')}</th>
+                    <th className="px-3 py-3">{label('opportunityScore')}</th>
                     <th className="px-3 py-3">{label('engagement')}</th>
                     <th className="px-3 py-3">{label('published')}</th>
                   </tr>
@@ -259,7 +385,29 @@ export function YoutubeMarketResearch() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatCount(video.viewCount)}</td>
                       <td className="whitespace-nowrap px-3 py-3 tabular-nums">{countFormat.format(video.viewsPerDay)}</td>
-                      <td className="whitespace-nowrap px-3 py-3 tabular-nums">{numberFormat.format(video.velocityIndex)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 tabular-nums">
+                        {video.momentumViewsPerDay === null
+                          ? label('waitingMomentum')
+                          : (
+                            <>
+                              <div>{countFormat.format(video.momentumViewsPerDay)} /hari</div>
+                              <div className="text-xs text-muted-foreground">
+                                {video.momentumGrowthPct === null ? '—' : (video.momentumGrowthPct >= 0 ? '+' : '') + numberFormat.format(video.momentumGrowthPct) + '%'}
+                                {' · '}{Math.round(video.momentumSampleHours ?? 0)}h
+                              </div>
+                            </>
+                          )}
+                      </td>
+                      <td className="min-w-[150px] px-3 py-3">
+                        <div className="font-semibold tabular-nums">{video.opportunityScore}/100</div>
+                        <div className="text-xs text-muted-foreground">{label('confidence.' + video.scoringConfidence)}</div>
+                        <details className="mt-1 max-w-[240px]">
+                          <summary className="cursor-pointer text-xs text-primary">{label('scoreDetails')}</summary>
+                          <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                            {video.opportunityRationale.map((reason, index) => <li key={index}>{reason}</li>)}
+                          </ul>
+                        </details>
+                      </td>
                       <td className="whitespace-nowrap px-3 py-3 tabular-nums">{numberFormat.format(video.engagementRate)}%</td>
                       <td className="whitespace-nowrap px-3 py-3">{formatDate(video.publishedAt)}</td>
                     </tr>

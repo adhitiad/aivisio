@@ -57,3 +57,21 @@ Supported observation windows: 7, 30, 90, 365 days.
 ## Not yet included
 
 This public market endpoint does not connect a creator's private channel analytics or revenue. Those require a separate, user-consented OAuth integration with the appropriate YouTube Analytics scopes and token lifecycle management.
+
+
+## Historical momentum and tracked topics
+
+Creators can save up to five market topics at `POST /api/youtube/market/topics`. Each saved topic is refreshed by the scheduled worker every six hours. Public video/channel counts are appended to immutable observation records; earlier observations are not overwritten when the six-hour result cache refreshes.
+
+Observed momentum is computed from the difference between two public view-count snapshots and normalized to views per day. A history gap shorter than 18 hours, longer than 10 days, or a decrease in the observed count is not treated as valid positive momentum. The first observation is a baseline, not evidence of growth.
+
+## Opportunity score v1
+
+The deterministic v1 score is a 0–100 research-priority index using available public signals:
+- Momentum from observed snapshots (35%).
+- Lifetime views/day as a demand proxy (25%).
+- Public engagement rate (15%).
+- Views/day relative to public subscriber count (15%).
+- Video freshness (10%).
+
+Unavailable components are excluded and remaining weights are renormalized. Each score stores the components and rationale. Confidence remains limited until observations accumulate; high confidence requires repeated snapshots and a valid momentum interval. It is not keyword search volume, a guarantee of virality, conversion probability, or revenue forecast.

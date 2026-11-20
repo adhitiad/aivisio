@@ -10,6 +10,8 @@ type Channel = {
   country: string | null
   connectionStatus: string
   lastSyncedAt: string | null
+  lastAnalyticsSyncedAt: string | null
+  analyticsSyncError: string | null
 }
 
 type ChannelsPayload = {
@@ -26,6 +28,10 @@ type AnalyticsRow = {
   views: string
   estimatedMinutesWatched: number
   averageViewDuration: number
+  averageViewPercentage: number
+  likes: string
+  comments: string
+  shares: string
   subscribersGained: number
   subscribersLost: number
   estimatedRevenue: number | null
@@ -133,6 +139,8 @@ export function YoutubeAnalyticsDashboard() {
     if (!report) return null
     const views = sumViews(report.rows)
     const watchMinutes = sumMetric(report.rows, 'estimatedMinutesWatched')
+    const likes = report.rows.reduce((sum, row) => sum + BigInt(row.likes), 0n)
+    const comments = report.rows.reduce((sum, row) => sum + BigInt(row.comments), 0n)
     const gained = sumMetric(report.rows, 'subscribersGained')
     const lost = sumMetric(report.rows, 'subscribersLost')
     const revenue = sumMetric(report.rows, 'estimatedRevenue')
@@ -144,6 +152,8 @@ export function YoutubeAnalyticsDashboard() {
     const viewCount = Number(views)
     return {
       views: compact.format(views),
+      likes: compact.format(likes),
+      comments: compact.format(comments),
       watchHours: number.format(watchMinutes / 60),
       avgDuration: viewCount > 0 ? number.format(weightedDuration / viewCount) + 's' : '—',
       netSubscribers: number.format(gained - lost),
@@ -244,6 +254,16 @@ export function YoutubeAnalyticsDashboard() {
               <p className="text-xs text-muted-foreground">
                 {connection.hasMonetaryAccess ? label('revenueAccess') : label('noRevenueAccess')}
               </p>
+              <p className="text-xs text-muted-foreground">
+                {label('lastSync')}: {channels.find((channel) => channel.id === channelId)?.lastAnalyticsSyncedAt
+                  ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(channels.find((channel) => channel.id === channelId)!.lastAnalyticsSyncedAt!))
+                  : label('neverSynced')}
+              </p>
+              {channels.find((channel) => channel.id === channelId)?.analyticsSyncError ? (
+                <p className="text-xs text-destructive">
+                  {label('syncWarning')}: {channels.find((channel) => channel.id === channelId)?.analyticsSyncError}
+                </p>
+              ) : null}
             </div>
             <form method="post" action="/api/youtube/oauth/connect">
               <button type="submit" className="h-9 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted">
@@ -338,6 +358,8 @@ export function YoutubeAnalyticsDashboard() {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Metric label={label('views')} value={summary.views} />
                 <Metric label={label('watchHours')} value={summary.watchHours} suffix="jam" />
+                <Metric label={label('likes')} value={summary.likes} />
+                <Metric label={label('comments')} value={summary.comments} />
                 <Metric label={label('averageDuration')} value={summary.avgDuration} />
                 <Metric label={label('netSubscribers')} value={summary.netSubscribers} />
                 {report.includesRevenue ? (
@@ -359,6 +381,10 @@ export function YoutubeAnalyticsDashboard() {
                         <th className="px-3 py-3">{label('views')}</th>
                         <th className="px-3 py-3">{label('watchMinutes')}</th>
                         <th className="px-3 py-3">{label('averageDuration')}</th>
+                        <th className="px-3 py-3">{label('averagePercentage')}</th>
+                        <th className="px-3 py-3">{label('likes')}</th>
+                        <th className="px-3 py-3">{label('comments')}</th>
+                        <th className="px-3 py-3">{label('shares')}</th>
                         <th className="px-3 py-3">{label('subscribersGained')}</th>
                         <th className="px-3 py-3">{label('subscribersLost')}</th>
                         {report.includesRevenue ? <th className="px-3 py-3">{label('estimatedRevenue')}</th> : null}
@@ -371,6 +397,10 @@ export function YoutubeAnalyticsDashboard() {
                           <td className="px-3 py-3 tabular-nums">{compact.format(BigInt(row.views))}</td>
                           <td className="px-3 py-3 tabular-nums">{number.format(row.estimatedMinutesWatched)}</td>
                           <td className="px-3 py-3 tabular-nums">{number.format(row.averageViewDuration)}s</td>
+                          <td className="px-3 py-3 tabular-nums">{number.format(row.averageViewPercentage)}%</td>
+                          <td className="px-3 py-3 tabular-nums">{compact.format(BigInt(row.likes))}</td>
+                          <td className="px-3 py-3 tabular-nums">{compact.format(BigInt(row.comments))}</td>
+                          <td className="px-3 py-3 tabular-nums">{compact.format(BigInt(row.shares))}</td>
                           <td className="px-3 py-3 tabular-nums">{number.format(row.subscribersGained)}</td>
                           <td className="px-3 py-3 tabular-nums">{number.format(row.subscribersLost)}</td>
                           {report.includesRevenue ? <td className="whitespace-nowrap px-3 py-3 tabular-nums">{currency.format(row.estimatedRevenue ?? 0)}</td> : null}

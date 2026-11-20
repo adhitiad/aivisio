@@ -243,7 +243,14 @@
       "subscribersLost": "Subscribers lost",
       "noRows": "No Analytics data is available for this date range yet.",
       "limitations": "Data notes",
-      "reauthorize": "Reauthorize Google permissions"
+      "reauthorize": "Reauthorize Google permissions",
+      "likes": "Likes",
+      "comments": "Comments",
+      "shares": "Shares",
+      "averagePercentage": "Average percentage viewed",
+      "lastSync": "Last sync",
+      "neverSynced": "Not synced yet",
+      "syncWarning": "Scheduled sync warning"
     }
   },
   "studio": {

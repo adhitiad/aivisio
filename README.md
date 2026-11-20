@@ -133,3 +133,12 @@ AIVISO provides public market discovery through the YouTube Data API v3. Set `YO
 Authenticated creators can call `POST /api/youtube/market/search` with a query, SEA market code, date window, sort order, and maximum result count. The service caches results for six hours and enforces a conservative daily quota guard.
 
 This endpoint returns public video/channel statistics and relative sample velocity. It does **not** return keyword search volume, impressions, CTR, watch time, or private channel revenue. Those require separate sources and/or creator-authorized YouTube Analytics access.
+
+
+## Private YouTube Analytics, market history, and opportunity scoring
+
+- Connect a creator's YouTube channel at `/dashboard/analytics`. Daily private metrics can be backfilled and refreshed through the authenticated scheduler.
+- Save up to five public market queries at `/dashboard/research`. The scheduled worker records public video observations every six hours, enabling measured momentum rather than lifetime views/day alone.
+- Opportunity Score v1 ranks public video opportunities using documented momentum, lifetime view rate, engagement, subscriber reach, and freshness components. Scores include rationale and a confidence level.
+
+Set `YOUTUBE_CRON_SECRET` on the application server. To activate the included GitHub scheduled workflow, set repository variable `AIVISO_BASE_URL` (for example `https://your-domain.example`) and repository secret `YOUTUBE_CRON_SECRET`. The workflow file must be merged into the repository's default branch for scheduled runs to execute. See [docs/YOUTUBE-OAUTH-ANALYTICS.md](docs/YOUTUBE-OAUTH-ANALYTICS.md) and [docs/YOUTUBE-MARKET-RESEARCH.md](docs/YOUTUBE-MARKET-RESEARCH.md).

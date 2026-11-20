@@ -243,7 +243,14 @@
       "subscribersLost": "Subscriber hilang",
       "noRows": "Belum ada data Analytics untuk rentang tanggal ini.",
       "limitations": "Catatan data",
-      "reauthorize": "Perbarui izin Google"
+      "reauthorize": "Perbarui izin Google",
+      "likes": "Likes",
+      "comments": "Komentar",
+      "shares": "Dibagikan",
+      "averagePercentage": "Rata-rata persentase ditonton",
+      "lastSync": "Sinkronisasi terakhir",
+      "neverSynced": "Belum pernah sinkron",
+      "syncWarning": "Sinkronisasi otomatis bermasalah"
     }
   },
   "studio": {
