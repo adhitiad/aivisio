@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import {
   isJobRunning,
@@ -17,16 +18,28 @@ import {
 } from '@/lib/video/config'
 import { moduleLogger } from '@/lib/logger'
 import { getApiSession } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
+import { sameOriginGuard } from '@/lib/security/http'
 
 const log = moduleLogger('api-video')
+const createSchema = z.object({
+  topic: z.string().trim().min(5).max(300),
+  format: z.enum(['short', 'long']).optional(),
+  renderMode: z.enum(['cinematic', 'fast']).optional(),
+  style: z.string().max(80).optional(),
+  voice: z.enum(['off', 'on', 'tongtong']).optional(),
+  researchEnabled: z.boolean().optional(),
+  targetScenes: z.number().int().optional(),
+  aspect: z.string().max(8).optional(),
+}).strict()
 
 function agentSummary(scenes: SceneState[]) {
-  return Array.from({ length: AGENT_COUNT }, (_, i) => {
-    const mine = scenes.filter((s) => s.agent === i + 1)
-    const current = mine.find((s) => s.status === 'processing')
+  return Array.from({ length: AGENT_COUNT }, (_, index) => {
+    const mine = scenes.filter((scene) => scene.agent === index + 1)
+    const current = mine.find((scene) => scene.status === 'processing')
     return {
-      id: i + 1,
-      done: mine.filter((s) => s.status === 'done').length,
+      id: index + 1,
+      done: mine.filter((scene) => scene.status === 'done').length,
       currentIdx: current?.idx ?? null,
       state: current
         ? ('working' as const)
@@ -41,50 +54,82 @@ export const Route = createFileRoute('/api/video')({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        const originDenied = sameOriginGuard(request)
+        if (originDenied) return originDenied
+
         try {
           const session = await getApiSession()
           if (!session) {
-            return Response.json({ error: 'Masuk terlebih dahulu untuk membuat project video.' }, { status: 401 })
-          }
-          const body = await request.json().catch(() => null)
-          const topic = String(body?.topic ?? '').trim()
-          const format = body?.format === 'long' ? 'long' : 'short'
-          const renderMode = body?.renderMode === 'fast' ? 'fast' : 'cinematic'
-          const styleId = STYLES.some((s) => s.id === body?.style)
-            ? String(body.style)
-            : STYLES[0].id
-          const voice = body?.voice === 'off' ? 'off' : 'tongtong'
-          const researchEnabled = body?.researchEnabled === true && format === 'short'
-
-          if (topic.length < 5) {
-            return Response.json({ error: 'Topik video minimal 5 karakter.' }, { status: 400 })
-          }
-          if (topic.length > 300) {
             return Response.json(
-              { error: 'Topik video terlalu panjang (maks 300 karakter).' },
-              { status: 400 },
+              { error: 'Masuk terlebih dahulu untuk membuat project video.' },
+              { status: 401 },
             )
           }
+
+          if (!rateLimit('video:create:' + session.user.id, 2, 15 * 60 * 1000)) {
+            return Response.json(
+              { error: 'Batas pembuatan video sementara tercapai. Coba lagi nanti.' },
+              { status: 429 },
+            )
+          }
+
+          const raw = await request.text()
+          if (new TextEncoder().encode(raw).byteLength > 16_000) {
+            return Response.json({ error: 'Payload terlalu besar.' }, { status: 413 })
+          }
+
+          let body: unknown
+          try {
+            body = JSON.parse(raw)
+          } catch {
+            return Response.json({ error: 'Body tidak valid.' }, { status: 400 })
+          }
+
+          const parsed = createSchema.safeParse(body)
+          if (!parsed.success) {
+            return Response.json({ error: 'Parameter video tidak valid.' }, { status: 400 })
+          }
+
+          const input = parsed.data
+          const format = input.format ?? 'short'
+          const renderMode = input.renderMode ?? 'cinematic'
+          const styleId = STYLES.some((style) => style.id === input.style)
+            ? input.style!
+            : STYLES[0].id
+          const voice = input.voice === 'off' ? 'off' : 'tongtong'
+          const researchEnabled = input.researchEnabled === true && format === 'short'
 
           let targetScenes: number
           if (format === 'short') {
             targetScenes = SHORT_SCENES
           } else {
-            const requested = Number(body?.targetScenes)
-            targetScenes = LONG_DURATIONS.some((d) => d.scenes === requested)
-              ? requested
+            targetScenes = LONG_DURATIONS.some((duration) => duration.scenes === input.targetScenes)
+              ? input.targetScenes!
               : 30
           }
 
-          const requestedAspect = String(body?.aspect ?? '')
+          const requestedAspect = input.aspect ?? ''
           const aspect: Aspect = isAspectAllowed(requestedAspect, format)
             ? (requestedAspect as Aspect)
             : DEFAULT_ASPECT[format]
 
+          const activeJobs = await db.videoProject.count({
+            where: {
+              userId: session.user.id,
+              status: { in: ['queued', 'planning', 'building', 'stitching'] },
+            },
+          })
+          if (activeJobs >= 2) {
+            return Response.json(
+              { error: 'Maksimal dua project video dapat diproses bersamaan.' },
+              { status: 409 },
+            )
+          }
+
           const created = await db.videoProject.create({
             data: {
               userId: session.user.id,
-              topic,
+              topic: input.topic,
               format,
               style: styleId,
               renderMode,
@@ -99,7 +144,7 @@ export const Route = createFileRoute('/api/video')({
 
           startVideoJob(created.id)
           log.info(
-            { id: created.id, format, aspect, renderMode, researchEnabled },
+            { id: created.id, userId: session.user.id, format, aspect, renderMode, researchEnabled },
             'project video dibuat',
           )
           return Response.json({ id: created.id, status: created.status })
@@ -141,17 +186,14 @@ export const Route = createFileRoute('/api/video')({
                 createdAt: true,
               },
             })
-            return Response.json({ list })
+            return Response.json({ list }, { headers: { 'Cache-Control': 'private, no-store' } })
           }
 
           let project = await db.videoProject.findFirst({
             where: { id, userId: session.user.id },
           })
           if (!project) {
-            return Response.json(
-              { error: 'Project video tidak ditemukan.' },
-              { status: 404 },
-            )
+            return Response.json({ error: 'Project video tidak ditemukan.' }, { status: 404 })
           }
 
           const activeStatus = ['queued', 'planning', 'building', 'stitching']
@@ -176,60 +218,62 @@ export const Route = createFileRoute('/api/video')({
             scenes = []
           }
 
-          return Response.json({
-            project: {
-              id: project.id,
-              topic: project.topic,
-              title: project.title,
-              description: project.description,
-              format: project.format,
-              style: project.style,
-              renderMode: project.renderMode,
-              voice: project.voice,
-              aspect: project.aspect,
-              researchEnabled: project.researchEnabled,
-              status: project.status,
-              stageDetail: project.stageDetail,
-              progress: project.progress,
-              scenesTotal: project.scenesTotal,
-              scenesDone: project.scenesDone,
-              durationSec: project.durationSec,
-              fileBytes: project.fileBytes,
-              error: project.error,
-              createdAt: project.createdAt,
-              updatedAt: project.updatedAt,
-              scenes,
-              research: (() => {
-                try {
-                  return JSON.parse(project.research) as unknown
-                } catch {
-                  return null
-                }
-              })(),
+          return Response.json(
+            {
+              project: {
+                id: project.id,
+                topic: project.topic,
+                title: project.title,
+                description: project.description,
+                format: project.format,
+                style: project.style,
+                renderMode: project.renderMode,
+                voice: project.voice,
+                aspect: project.aspect,
+                researchEnabled: project.researchEnabled,
+                status: project.status,
+                stageDetail: project.stageDetail,
+                progress: project.progress,
+                scenesTotal: project.scenesTotal,
+                scenesDone: project.scenesDone,
+                durationSec: project.durationSec,
+                fileBytes: project.fileBytes,
+                error: project.error,
+                createdAt: project.createdAt,
+                updatedAt: project.updatedAt,
+                scenes,
+                research: (() => {
+                  try {
+                    return JSON.parse(project.research) as unknown
+                  } catch {
+                    return null
+                  }
+                })(),
+              },
+              agents: agentSummary(scenes),
             },
-            agents: agentSummary(scenes),
-          })
+            { headers: { 'Cache-Control': 'private, no-store' } },
+          )
         } catch (err) {
           log.error(
             { err: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
             'video GET error',
           )
-          return Response.json(
-            { error: 'Gagal mengambil status video.' },
-            { status: 500 },
-          )
+          return Response.json({ error: 'Gagal mengambil status video.' }, { status: 500 })
         }
       },
 
       DELETE: async ({ request }: { request: Request }) => {
+        const originDenied = sameOriginGuard(request)
+        if (originDenied) return originDenied
         try {
           const session = await getApiSession()
           if (!session) {
             return Response.json({ error: 'Masuk terlebih dahulu.' }, { status: 401 })
           }
           const id = new URL(request.url).searchParams.get('id')
-          if (!id) {
-            return Response.json({ error: 'Parameter id wajib.' }, { status: 400 })
+          if (!id || id.length > 80) {
+            return Response.json({ error: 'Parameter id tidak valid.' }, { status: 400 })
           }
           if (isJobRunning(id)) {
             return Response.json(
@@ -252,10 +296,7 @@ export const Route = createFileRoute('/api/video')({
             { err: err instanceof Error ? err.message.slice(0, 200) : 'unknown' },
             'video DELETE error',
           )
-          return Response.json(
-            { error: 'Gagal menghapus project video.' },
-            { status: 500 },
-          )
+          return Response.json({ error: 'Gagal menghapus project video.' }, { status: 500 })
         }
       },
     },

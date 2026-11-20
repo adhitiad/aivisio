@@ -1,31 +1,31 @@
 import { createServerFn } from '@tanstack/react-start'
 import { db } from './db'
 import { getSettings } from './settings'
-import { getSessionFn } from './auth.functions'
-
-function maskKey(key: string): string {
-  if (!key) return ''
-  if (key.length <= 8) return '****'
-  return `****${key.slice(-4)}`
-}
+import { requirePrincipal } from './authorization'
+import { maskProviderApiKey } from './provider-secrets'
 
 async function requireUserId(): Promise<string> {
-  const session = await getSessionFn()
-  if (!session) throw new Error('Masuk terlebih dahulu.')
-  return session.user.id
+  const principal = await requirePrincipal()
+  return principal.userId
+}
+
+async function requireAdmin(): Promise<void> {
+  await requirePrincipal(['OWNER', 'ADMIN'])
 }
 
 export const getDashboardStatsFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const userId = await requireUserId()
+    const principal = await requirePrincipal()
+    const isAdmin = principal.role === 'OWNER' || principal.role === 'ADMIN'
+    const userScope = isAdmin ? {} : { userId: principal.userId }
     const [generations, videos, activeProviders, newMessages, recent] =
       await Promise.all([
-        db.generation.count({ where: { userId } }),
-        db.videoProject.count({ where: { userId } }),
-        db.aiProvider.count({ where: { active: true } }),
-        db.contactMessage.count({ where: { status: 'new' } }),
+        db.generation.count({ where: userScope }),
+        db.videoProject.count({ where: userScope }),
+        isAdmin ? db.aiProvider.count({ where: { active: true } }) : Promise.resolve(0),
+        isAdmin ? db.contactMessage.count({ where: { status: 'new' } }) : Promise.resolve(0),
         db.generation.findMany({
-          where: { userId },
+          where: userScope,
           orderBy: { createdAt: 'desc' },
           take: 5,
           select: { id: true, toolId: true, title: true, createdAt: true },
@@ -50,10 +50,10 @@ export const getHistoryRowsFn = createServerFn({ method: 'GET' }).handler(
         updatedAt: true,
       },
     })
-    return items.map((i) => ({
-      ...i,
-      createdAt: i.createdAt.toISOString(),
-      updatedAt: i.updatedAt.toISOString(),
+    return items.map((item) => ({
+      ...item,
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
     }))
   },
 )
@@ -77,46 +77,51 @@ export const getVideoRowsFn = createServerFn({ method: 'GET' }).handler(
         updatedAt: true,
       },
     })
-    return items.map((i) => ({
-      ...i,
-      createdAt: i.createdAt.toISOString(),
-      updatedAt: i.updatedAt.toISOString(),
+    return items.map((item) => ({
+      ...item,
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
     }))
   },
 )
 
 export const getProviderRowsFn = createServerFn({ method: 'GET' }).handler(
   async () => {
+    await requireAdmin()
     const rows = await db.aiProvider.findMany({ orderBy: { sortOrder: 'asc' } })
-    return rows.map((r) => ({
-      id: r.id,
-      key: r.key,
-      label: r.label,
-      model: r.model,
-      enabled: r.enabled,
-      active: r.active,
-      status: r.status,
-      statusMessage: r.statusMessage,
-      keyMask: maskKey(r.apiKey),
-      updatedAt: r.updatedAt.toISOString(),
+    return rows.map((row) => ({
+      id: row.id,
+      key: row.key,
+      label: row.label,
+      model: row.model,
+      enabled: row.enabled,
+      active: row.active,
+      status: row.status,
+      statusMessage: row.statusMessage,
+      keyMask: maskProviderApiKey(row.apiKey) ?? '',
+      updatedAt: row.updatedAt.toISOString(),
     }))
   },
 )
 
 export const getMessageRowsFn = createServerFn({ method: 'GET' }).handler(
   async () => {
+    await requireAdmin()
     const items = await db.contactMessage.findMany({
       orderBy: { createdAt: 'desc' },
     })
-    return items.map((i) => ({
-      ...i,
-      subject: i.subject ?? null,
-      createdAt: i.createdAt.toISOString(),
-      updatedAt: i.updatedAt.toISOString(),
+    return items.map((item) => ({
+      ...item,
+      subject: item.subject ?? null,
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
     }))
   },
 )
 
 export const getSettingsPageFn = createServerFn({ method: 'GET' }).handler(
-  async () => getSettings(),
+  async () => {
+    await requireAdmin()
+    return getSettings()
+  },
 )

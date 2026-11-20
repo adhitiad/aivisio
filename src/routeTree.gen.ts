@@ -36,10 +36,18 @@ import { Route as ProtectedDashboardMessagesRouteImport } from './routes/_protec
 import { Route as ProtectedDashboardProvidersRouteImport } from './routes/_protected.dashboard.providers'
 import { Route as ProtectedDashboardSettingsRouteImport } from './routes/_protected.dashboard.settings'
 import { Route as ProtectedDashboardVideosRouteImport } from './routes/_protected.dashboard.videos'
+import { Route as ProtectedDashboardResearchRouteImport } from './routes/_protected.dashboard.research'
+import { Route as ProtectedDashboardAnalyticsRouteImport } from './routes/_protected.dashboard.analytics'
 import { Route as ApiAiProvidersTestRouteImport } from './routes/api.ai-providers.test'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as ApiNotificationsIdRouteImport } from './routes/api.notifications.$id'
 import { Route as ApiVideoFileRouteImport } from './routes/api.video.file'
+import { Route as ApiYoutubeMarketSearchRouteImport } from './routes/api.youtube.market.search'
+import { Route as ApiYoutubeOauthConnectRouteImport } from './routes/api.youtube.oauth.connect'
+import { Route as ApiYoutubeOauthCallbackRouteImport } from './routes/api.youtube.oauth.callback'
+import { Route as ApiYoutubeChannelsRouteImport } from './routes/api.youtube.channels'
+import { Route as ApiYoutubeAnalyticsRouteImport } from './routes/api.youtube.analytics'
+import { Route as ApiYoutubeDisconnectRouteImport } from './routes/api.youtube.disconnect'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -150,6 +158,36 @@ const ApiVideoRoute = ApiVideoRouteImport.update({
   path: '/video',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiYoutubeMarketSearchRoute = ApiYoutubeMarketSearchRouteImport.update({
+  id: '/youtube/market/search',
+  path: '/youtube/market/search',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeOauthConnectRoute = ApiYoutubeOauthConnectRouteImport.update({
+  id: '/youtube/oauth/connect',
+  path: '/youtube/oauth/connect',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeOauthCallbackRoute = ApiYoutubeOauthCallbackRouteImport.update({
+  id: '/youtube/oauth/callback',
+  path: '/youtube/oauth/callback',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeChannelsRoute = ApiYoutubeChannelsRouteImport.update({
+  id: '/youtube/channels',
+  path: '/youtube/channels',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeAnalyticsRoute = ApiYoutubeAnalyticsRouteImport.update({
+  id: '/youtube/analytics',
+  path: '/youtube/analytics',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiYoutubeDisconnectRoute = ApiYoutubeDisconnectRouteImport.update({
+  id: '/youtube/disconnect',
+  path: '/youtube/disconnect',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ProtectedDashboardHistoryRoute =
   ProtectedDashboardHistoryRouteImport.update({
     id: '/history',
@@ -180,6 +218,16 @@ const ProtectedDashboardVideosRoute =
     path: '/videos',
     getParentRoute: () => ProtectedDashboardRoute,
   } as any)
+const ProtectedDashboardResearchRoute = ProtectedDashboardResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => ProtectedDashboardRoute,
+} as any)
+const ProtectedDashboardAnalyticsRoute = ProtectedDashboardAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => ProtectedDashboardRoute,
+} as any)
 const ApiAiProvidersTestRoute = ApiAiProvidersTestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -228,10 +276,18 @@ export interface FileRoutesByFullPath {
   '/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/dashboard/research': typeof ProtectedDashboardResearchRoute
+  '/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
+  '/api/youtube/oauth/connect': typeof ApiYoutubeOauthConnectRoute
+  '/api/youtube/oauth/callback': typeof ApiYoutubeOauthCallbackRoute
+  '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
+  '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
+  '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -260,10 +316,18 @@ export interface FileRoutesByTo {
   '/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/dashboard/research': typeof ProtectedDashboardResearchRoute
+  '/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
+  '/api/youtube/oauth/connect': typeof ApiYoutubeOauthConnectRoute
+  '/api/youtube/oauth/callback': typeof ApiYoutubeOauthCallbackRoute
+  '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
+  '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
+  '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -294,10 +358,18 @@ export interface FileRoutesById {
   '/_protected/dashboard/providers': typeof ProtectedDashboardProvidersRoute
   '/_protected/dashboard/settings': typeof ProtectedDashboardSettingsRoute
   '/_protected/dashboard/videos': typeof ProtectedDashboardVideosRoute
+  '/_protected/dashboard/research': typeof ProtectedDashboardResearchRoute
+  '/_protected/dashboard/analytics': typeof ProtectedDashboardAnalyticsRoute
   '/api/ai-providers/test': typeof ApiAiProvidersTestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/notifications/$id': typeof ApiNotificationsIdRoute
   '/api/video/file': typeof ApiVideoFileRoute
+  '/api/youtube/market/search': typeof ApiYoutubeMarketSearchRoute
+  '/api/youtube/oauth/connect': typeof ApiYoutubeOauthConnectRoute
+  '/api/youtube/oauth/callback': typeof ApiYoutubeOauthCallbackRoute
+  '/api/youtube/channels': typeof ApiYoutubeChannelsRoute
+  '/api/youtube/analytics': typeof ApiYoutubeAnalyticsRoute
+  '/api/youtube/disconnect': typeof ApiYoutubeDisconnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -328,10 +400,18 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/settings'
     | '/dashboard/videos'
+    | '/dashboard/research'
+    | '/dashboard/analytics'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
+    | '/api/youtube/oauth/connect'
+    | '/api/youtube/oauth/callback'
+    | '/api/youtube/channels'
+    | '/api/youtube/analytics'
+    | '/api/youtube/disconnect'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -360,10 +440,18 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/settings'
     | '/dashboard/videos'
+    | '/dashboard/research'
+    | '/dashboard/analytics'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
+    | '/api/youtube/oauth/connect'
+    | '/api/youtube/oauth/callback'
+    | '/api/youtube/channels'
+    | '/api/youtube/analytics'
+    | '/api/youtube/disconnect'
   id:
     | '__root__'
     | '/'
@@ -393,10 +481,18 @@ export interface FileRouteTypes {
     | '/_protected/dashboard/providers'
     | '/_protected/dashboard/settings'
     | '/_protected/dashboard/videos'
+    | '/_protected/dashboard/research'
+    | '/_protected/dashboard/analytics'
     | '/api/ai-providers/test'
     | '/api/auth/$'
     | '/api/notifications/$id'
     | '/api/video/file'
+    | '/api/youtube/market/search'
+    | '/api/youtube/oauth/connect'
+    | '/api/youtube/oauth/callback'
+    | '/api/youtube/channels'
+    | '/api/youtube/analytics'
+    | '/api/youtube/disconnect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -604,6 +700,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedDashboardVideosRouteImport
       parentRoute: typeof ProtectedDashboardRoute
     }
+    '/_protected/dashboard/research': {
+      id: '/_protected/dashboard/research'
+      path: '/research'
+      fullPath: '/dashboard/research'
+      preLoaderRoute: typeof ProtectedDashboardResearchRouteImport
+      parentRoute: typeof ProtectedDashboardRoute
+    }
+    '/_protected/dashboard/analytics': {
+      id: '/_protected/dashboard/analytics'
+      path: '/analytics'
+      fullPath: '/dashboard/analytics'
+      preLoaderRoute: typeof ProtectedDashboardAnalyticsRouteImport
+      parentRoute: typeof ProtectedDashboardRoute
+    }
     '/api/ai-providers/test': {
       id: '/api/ai-providers/test'
       path: '/test'
@@ -632,6 +742,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVideoFileRouteImport
       parentRoute: typeof ApiVideoRoute
     }
+    '/api/youtube/market/search': {
+      id: '/api/youtube/market/search'
+      path: '/youtube/market/search'
+      fullPath: '/api/youtube/market/search'
+      preLoaderRoute: typeof ApiYoutubeMarketSearchRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/oauth/connect': {
+      id: '/api/youtube/oauth/connect'
+      path: '/youtube/oauth/connect'
+      fullPath: '/api/youtube/oauth/connect'
+      preLoaderRoute: typeof ApiYoutubeOauthConnectRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/oauth/callback': {
+      id: '/api/youtube/oauth/callback'
+      path: '/youtube/oauth/callback'
+      fullPath: '/api/youtube/oauth/callback'
+      preLoaderRoute: typeof ApiYoutubeOauthCallbackRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/channels': {
+      id: '/api/youtube/channels'
+      path: '/youtube/channels'
+      fullPath: '/api/youtube/channels'
+      preLoaderRoute: typeof ApiYoutubeChannelsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/analytics': {
+      id: '/api/youtube/analytics'
+      path: '/youtube/analytics'
+      fullPath: '/api/youtube/analytics'
+      preLoaderRoute: typeof ApiYoutubeAnalyticsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/youtube/disconnect': {
+      id: '/api/youtube/disconnect'
+      path: '/youtube/disconnect'
+      fullPath: '/api/youtube/disconnect'
+      preLoaderRoute: typeof ApiYoutubeDisconnectRouteImport
+      parentRoute: typeof ApiRoute
+    }
   }
 }
 
@@ -641,6 +793,8 @@ interface ProtectedDashboardRouteChildren {
   ProtectedDashboardProvidersRoute: typeof ProtectedDashboardProvidersRoute
   ProtectedDashboardSettingsRoute: typeof ProtectedDashboardSettingsRoute
   ProtectedDashboardVideosRoute: typeof ProtectedDashboardVideosRoute
+  ProtectedDashboardResearchRoute: typeof ProtectedDashboardResearchRoute
+  ProtectedDashboardAnalyticsRoute: typeof ProtectedDashboardAnalyticsRoute
 }
 
 const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
@@ -649,6 +803,8 @@ const ProtectedDashboardRouteChildren: ProtectedDashboardRouteChildren = {
   ProtectedDashboardProvidersRoute: ProtectedDashboardProvidersRoute,
   ProtectedDashboardSettingsRoute: ProtectedDashboardSettingsRoute,
   ProtectedDashboardVideosRoute: ProtectedDashboardVideosRoute,
+  ProtectedDashboardResearchRoute: ProtectedDashboardResearchRoute,
+  ProtectedDashboardAnalyticsRoute: ProtectedDashboardAnalyticsRoute,
 }
 
 const ProtectedDashboardRouteWithChildren =
@@ -712,6 +868,12 @@ interface ApiRouteChildren {
   ApiNotificationsRoute: typeof ApiNotificationsRouteWithChildren
   ApiSettingsRoute: typeof ApiSettingsRoute
   ApiVideoRoute: typeof ApiVideoRouteWithChildren
+  ApiYoutubeMarketSearchRoute: typeof ApiYoutubeMarketSearchRoute
+  ApiYoutubeOauthConnectRoute: typeof ApiYoutubeOauthConnectRoute
+  ApiYoutubeOauthCallbackRoute: typeof ApiYoutubeOauthCallbackRoute
+  ApiYoutubeChannelsRoute: typeof ApiYoutubeChannelsRoute
+  ApiYoutubeAnalyticsRoute: typeof ApiYoutubeAnalyticsRoute
+  ApiYoutubeDisconnectRoute: typeof ApiYoutubeDisconnectRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -726,6 +888,12 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiNotificationsRoute: ApiNotificationsRouteWithChildren,
   ApiSettingsRoute: ApiSettingsRoute,
   ApiVideoRoute: ApiVideoRouteWithChildren,
+  ApiYoutubeMarketSearchRoute: ApiYoutubeMarketSearchRoute,
+  ApiYoutubeOauthConnectRoute: ApiYoutubeOauthConnectRoute,
+  ApiYoutubeOauthCallbackRoute: ApiYoutubeOauthCallbackRoute,
+  ApiYoutubeChannelsRoute: ApiYoutubeChannelsRoute,
+  ApiYoutubeAnalyticsRoute: ApiYoutubeAnalyticsRoute,
+  ApiYoutubeDisconnectRoute: ApiYoutubeDisconnectRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 

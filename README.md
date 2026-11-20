@@ -85,8 +85,8 @@ Aplikasi tersedia di `http://localhost:3000`.
 ## Konfigurasi keamanan
 
 - Jangan commit file `.env` atau kredensial.
-- `ADMIN_API_GATE=1` mewajibkan OAuth untuk endpoint mutasi.
-- Untuk deployment publik multi-user, aktifkan `ADMIN_API_GATE`.
+- Set `OWNER_EMAILS` ke email OAuth terverifikasi untuk bootstrap OWNER awal.
+- Endpoint administrasi selalu memerlukan role OWNER atau ADMIN.
 - Gunakan HTTPS dan URL produksi yang konsisten pada `SITE_URL` serta redirect OAuth.
 - Baca [SECURITY.md](SECURITY.md) untuk detail kontrol OWASP dan keputusan konfigurasi.
 
@@ -104,3 +104,32 @@ Aplikasi tersedia di `http://localhost:3000`.
 Ikuti aturan dan pola repository di [docs/RULES.md](docs/RULES.md) serta
 [AGENTS.md](AGENTS.md). Teks antarmuka wajib ditambahkan ke `messages/id.json`
 dan `messages/en.json`.
+
+
+## Security & creator roles
+
+Set OWNER_EMAILS to one or more comma-separated, verified OAuth email addresses to bootstrap the initial OWNER. Other users default to CREATOR. Promote additional administrators only through an authorized database operator; see [docs/SECURITY-PHASE-1.md](docs/SECURITY-PHASE-1.md).
+
+Set PROVIDER_ENCRYPTION_KEY to a stable random secret before configuring AI provider credentials. If it is omitted, the application derives the credential-encryption key from BETTER_AUTH_SECRET. Existing plaintext provider keys can be encrypted with:
+
+```bash
+bun run security:encrypt-provider-keys
+```
+
+After pulling schema changes, run:
+
+```bash
+bun run db:generate
+bun run db:push
+```
+
+Run quality checks with `bun run typecheck`, `bun run lint`, and `bun test`.
+
+
+## YouTube SEA market research
+
+AIVISO provides public market discovery through the YouTube Data API v3. Set `YOUTUBE_DATA_API_KEY` in the server environment and restrict the key to the YouTube Data API v3 and trusted server IPs.
+
+Authenticated creators can call `POST /api/youtube/market/search` with a query, SEA market code, date window, sort order, and maximum result count. The service caches results for six hours and enforces a conservative daily quota guard.
+
+This endpoint returns public video/channel statistics and relative sample velocity. It does **not** return keyword search volume, impressions, CTR, watch time, or private channel revenue. Those require separate sources and/or creator-authorized YouTube Analytics access.
