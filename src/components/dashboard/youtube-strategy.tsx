@@ -10,6 +10,7 @@ type Idea = {
   status: string
   createdAt: string
   strategySnapshots?: Array<{ id: string; profileVersion: number; createdAt: string }>
+  videoProjects?: Array<{ id: string; status: string; createdAt: string }>
 }
 type StrategyForm = {
   niche: string
@@ -89,6 +90,7 @@ export function YoutubeStrategyDashboard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [producingIdeaId, setProducingIdeaId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -191,6 +193,54 @@ export function YoutubeStrategyDashboard() {
     }
   }
 
+  async function createVideoProject(idea: Idea) {
+    if (producingIdeaId) return
+    const activeProject = idea.videoProjects?.[0]
+    if (activeProject && ['queued', 'planning', 'building', 'stitching'].includes(activeProject.status)) {
+      setError(label('videoAlreadyRunning'))
+      return
+    }
+    setProducingIdeaId(idea.id)
+    setError('')
+    setNotice('')
+    try {
+      const topic = [idea.title, idea.angle].filter(Boolean).join(' — ').slice(0, 300)
+      if (topic.trim().length < 5) {
+        setError(label('videoTopicTooShort'))
+        return
+      }
+      const response = await fetch('/api/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          contentIdeaId: idea.id,
+          format: idea.format,
+          renderMode: 'cinematic',
+          style: 'dokumenter',
+          voice: 'tongtong',
+          researchEnabled: idea.format === 'short',
+          aspect: idea.format === 'short' ? '9:16' : '16:9',
+          targetScenes: idea.format === 'long' ? 30 : undefined,
+        }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || label('videoFailed'))
+      setIdeas((current) => current.map((item) => item.id === idea.id
+        ? {
+            ...item,
+            status: 'producing',
+            videoProjects: [{ id: payload.id as string, status: 'queued', createdAt: new Date().toISOString() }],
+          }
+        : item))
+      setNotice(label('videoQueued'))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : label('videoFailed'))
+    } finally {
+      setProducingIdeaId(null)
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">{label('loading')}</p>
 
   return (
@@ -281,7 +331,11 @@ export function YoutubeStrategyDashboard() {
               {ideas.length === 0 ? <p className="text-sm text-muted-foreground">{label('emptyIdeas')}</p> : ideas.map((idea) => (
                 <article key={idea.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3">
                   <div className="min-w-0"><p className="font-medium">{idea.title}</p><p className="text-xs text-muted-foreground">{idea.format.toUpperCase()} · {idea.status}</p>{idea.angle ? <p className="mt-1 text-sm text-muted-foreground">{idea.angle}</p> : null}</div>
-                  <span className="rounded-full border border-border px-2.5 py-1 text-xs">{label('snapshotVersion')} v{idea.strategySnapshots?.[0]?.profileVersion ?? '—'}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-border px-2.5 py-1 text-xs">{label('snapshotVersion')} v{idea.strategySnapshots?.[0]?.profileVersion ?? '—'}</span>
+                    {idea.videoProjects?.[0] ? <span className="rounded-full border border-border px-2.5 py-1 text-xs">{label('productionStatus')}: {idea.videoProjects[0].status}</span> : null}
+                    <button type="button" onClick={() => createVideoProject(idea)} disabled={producingIdeaId !== null || Boolean(idea.videoProjects?.[0] && ['queued', 'planning', 'building', 'stitching'].includes(idea.videoProjects[0].status))} className="h-9 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">{producingIdeaId === idea.id ? label('creatingVideo') : label(idea.videoProjects?.[0]?.status === 'done' ? 'createAnotherVideo' : 'createVideo')}</button>
+                  </div>
                 </article>
               ))}
             </div>

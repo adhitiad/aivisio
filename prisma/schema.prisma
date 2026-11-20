@@ -114,6 +114,8 @@ model Generation {
 model VideoProject {
   id              String   @id @default(uuid(7))
   userId          String?
+  contentIdeaId   String?
+  strategyContext String   @default("")
   topic           String
   format          String // "short" | "long"
   style           String
@@ -142,8 +144,10 @@ model VideoProject {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  contentIdea     ContentIdea? @relation(fields: [contentIdeaId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([contentIdeaId, createdAt])
   @@index([status])
   @@index([createdAt])
 }
@@ -258,11 +262,12 @@ model ContentIdea {
   title             String
   angle             String?
   format            String         @default("long") // short | long
-  status            String         @default("backlog") // backlog | researching | scripting | producing | published | archived
+  status            String         @default("backlog") // backlog | researching | scripting | producing | produced | production_failed | published | archived
   plannedFor        DateTime?
   evidence          String         @default("[]")
   channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   strategySnapshots YoutubeContentStrategySnapshot[]
+  videoProjects     VideoProject[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 

@@ -382,7 +382,15 @@
       "createSnapshot": "Create idea + snapshot",
       "recentIdeas": "Recent ideas",
       "emptyIdeas": "There are no content ideas for this channel yet.",
-      "snapshotVersion": "Strategy"
+      "snapshotVersion": "Strategy",
+      "createVideo": "Create video",
+      "creatingVideo": "Creating project...",
+      "createAnotherVideo": "Create another version",
+      "videoQueued": "Video project created and queued for the worker.",
+      "videoFailed": "Could not create the video project.",
+      "videoAlreadyRunning": "A video project for this idea is already running.",
+      "productionStatus": "Production",
+      "videoTopicTooShort": "The idea title or angle must contain at least 5 characters to create a video."
     },
     "youtubeRevenue": {
       "title": "Revenue Optimization Engine",

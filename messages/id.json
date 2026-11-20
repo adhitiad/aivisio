@@ -382,7 +382,15 @@
       "createSnapshot": "Buat ide + snapshot",
       "recentIdeas": "Ide terbaru",
       "emptyIdeas": "Belum ada ide konten untuk channel ini.",
-      "snapshotVersion": "Strategi"
+      "snapshotVersion": "Strategi",
+      "createVideo": "Buat video",
+      "creatingVideo": "Membuat project...",
+      "createAnotherVideo": "Buat versi lain",
+      "videoQueued": "Project video berhasil dibuat dan masuk antrean worker.",
+      "videoFailed": "Gagal membuat project video.",
+      "videoAlreadyRunning": "Project video untuk ide ini masih berjalan.",
+      "productionStatus": "Produksi",
+      "videoTopicTooShort": "Judul atau angle ide harus minimal 5 karakter untuk membuat video."
     },
     "youtubeRevenue": {
       "title": "Revenue Optimization Engine",

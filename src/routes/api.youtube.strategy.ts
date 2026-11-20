@@ -77,6 +77,11 @@ export const Route = createFileRoute('/api/youtube/strategy')({
                 take: 1,
                 select: { id: true, profileVersion: true, payload: true, createdAt: true },
               },
+              videoProjects: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { id: true, status: true, createdAt: true },
+              },
             },
           }),
         ])
