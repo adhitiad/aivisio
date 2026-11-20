@@ -32,6 +32,7 @@ model User {
   youtubeOAuthConnection YoutubeOAuthConnection?
   youtubeOAuthStates YoutubeOAuthState[]
   youtubePublications YoutubePublication[]
+  youtubePublishingAlerts YoutubePublishingAlert[]
   trackedMarketTopics YoutubeTrackedMarketTopic[]
   notifications Notification[]
   notificationReadReceipts NotificationReadReceipt[]
@@ -305,6 +306,7 @@ model Notification {
   userId    String? // null = broadcast ke semua user
   title     String
   body      String?
+  dedupeKey String?  @unique
   type      String   @default("info") // info | success | warning | error
   read      Boolean  @default(false)
   link      String?
@@ -833,4 +835,45 @@ model YoutubePublication {
   @@index([status, lockedAt])
   @@index([channelId, createdAt])
   @@index([videoProjectId])
+}
+
+
+/// Durable scheduler execution history. A run is created before work starts and finalized after completion.
+model YoutubeWorkerRun {
+  id          String   @id @default(uuid(7))
+  runId       String   @unique
+  status      String   @default("running") // running | success | error
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  eligible    Int?
+  attempted   Int?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([startedAt])
+  @@index([status, startedAt])
+}
+
+/// Current alert state with transition timestamps; Notification is the in-app delivery channel.
+model YoutubePublishingAlert {
+  id             String   @id @default(uuid(7))
+  userId         String
+  fingerprint    String
+  severity       String   // critical | warning
+  status         String   @default("active") // active | resolved
+  title          String
+  detail         String
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  resolvedAt     DateTime?
+  notificationId String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, fingerprint])
+  @@index([userId, status, lastSeenAt])
+  @@index([status, severity])
 }

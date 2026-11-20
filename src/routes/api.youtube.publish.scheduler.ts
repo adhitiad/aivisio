@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { runYoutubePublishingBatch } from '@/lib/youtube/publishing-worker'
 import { moduleLogger } from '@/lib/logger'
 import { getYoutubeWorkerHealthStatus } from '@/lib/youtube/publishing-utils'
+import { syncYoutubePublishingAlerts } from '@/lib/youtube/publishing-alerts'
 
 const log = moduleLogger('youtube-publishing-scheduler')
 const HEARTBEAT_KEY = 'youtube_publishing_worker_last_run'
@@ -114,6 +115,7 @@ export const Route = createFileRoute('/api/youtube/publish/scheduler')({
         const startedAt = new Date()
         const base: SchedulerRun = { runId, status: 'running', startedAt: startedAt.toISOString() }
         try {
+          await db.youtubeWorkerRun.create({ data: { runId, status: 'running', startedAt } })
           await saveHeartbeat(base)
           log.info({ runId }, 'YouTube scheduler invocation started')
           const batch = await runYoutubePublishingBatch(3)
@@ -126,12 +128,20 @@ export const Route = createFileRoute('/api/youtube/publish/scheduler')({
             eligible: batch.eligible,
             attempted: batch.attempted,
           }
+          await db.youtubeWorkerRun.update({ where: { runId }, data: { status: 'success', completedAt, durationMs: result.durationMs, eligible: result.eligible, attempted: result.attempted } })
           await saveHeartbeat(result)
-          log.info({ ...result }, 'YouTube scheduler invocation completed')
+          const alertSync = await syncYoutubePublishingAlerts(completedAt).catch(error => {
+            log.error({ runId, err: error instanceof Error ? error.message.slice(0, 200) : 'unknown' }, 'Persistent alert synchronization failed')
+            return { usersChecked: 0, notificationsDelivered: 0 }
+          })
+          log.info({ ...result, ...alertSync }, 'YouTube scheduler invocation completed')
           return Response.json({ ...batch, runId, durationMs: result.durationMs }, { headers: { 'Cache-Control': 'no-store' } })
         } catch (error) {
           const message = error instanceof Error ? error.message.slice(0, 250) : 'unknown'
           const completedAt = new Date()
+          await db.youtubeWorkerRun.update({ where: { runId }, data: { status: 'error', completedAt, durationMs: completedAt.getTime() - startedAt.getTime(), error: message } }).catch(saveError => {
+            log.error({ runId, err: saveError instanceof Error ? saveError.message.slice(0, 200) : 'unknown' }, 'Could not persist YouTube worker run failure')
+          })
           await saveHeartbeat({
             ...base,
             status: 'error',
@@ -141,6 +151,7 @@ export const Route = createFileRoute('/api/youtube/publish/scheduler')({
           }).catch(saveError => {
             log.error({ runId, err: saveError instanceof Error ? saveError.message.slice(0, 200) : 'unknown' }, 'Could not persist YouTube scheduler failure heartbeat')
           })
+          await syncYoutubePublishingAlerts(completedAt).catch(saveError => log.error({ runId, err: saveError instanceof Error ? saveError.message.slice(0, 200) : 'unknown' }, 'Persistent alert synchronization failed after scheduler error'))
           log.error({ runId, durationMs: completedAt.getTime() - startedAt.getTime(), err: message }, 'YouTube publishing scheduler failed')
           return Response.json({ error: 'Publishing worker gagal dijalankan.', runId }, { status: 500 })
         }

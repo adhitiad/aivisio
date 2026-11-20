@@ -61,6 +61,7 @@ import { Route as ApiYoutubeRevenueRouteImport } from './routes/api.youtube.reve
 import { Route as ApiYoutubePublishRouteImport } from './routes/api.youtube.publish'
 import { Route as ApiYoutubePublishSchedulerRouteImport } from './routes/api.youtube.publish.scheduler'
 import { Route as ApiYoutubePublishOperationsRouteImport } from './routes/api.youtube.publish.operations'
+import { Route as ApiYoutubePublishHistoryRouteImport } from './routes/api.youtube.publish.history'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',

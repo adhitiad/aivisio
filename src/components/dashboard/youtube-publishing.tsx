@@ -229,12 +229,18 @@ export function YoutubePublishingDashboard() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4" /> Peringatan operasional <Badge variant="outline">{operations.alerts.length}</Badge></CardTitle><CardDescription>Alert berdasarkan kondisi antrean dan heartbeat.</CardDescription></CardHeader>
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4" /> Peringatan operasional <Badge variant="outline">{operations.alerts.length}</Badge></CardTitle><CardDescription>Alert tersimpan dan dikirim sebagai notifikasi in-app saat pertama kali aktif.</CardDescription></CardHeader>
               <CardContent className="space-y-2">
-                {operations.alerts.length === 0 ? <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />Tidak ada alert aktif.</div> : operations.alerts.map(alert => <div key={alert.id} role="status" className={alert.severity === "critical" ? "rounded-md border border-destructive/30 bg-destructive/5 p-3" : "rounded-md border border-amber-500/30 bg-amber-500/5 p-3"}><div className="flex items-center gap-2 text-sm font-medium"><AlertCircle className="h-4 w-4" />{alert.title}</div><p className="mt-1 text-xs text-muted-foreground">{alert.detail}</p></div>)}
+                {operations.alerts.length === 0 ? <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />Tidak ada alert aktif.</div> : operations.alerts.map(alert => <div key={alert.id} role="status" className={alert.severity === "critical" ? "rounded-md border border-destructive/30 bg-destructive/5 p-3" : "rounded-md border border-amber-500/30 bg-amber-500/5 p-3"}><div className="flex items-center gap-2 text-sm font-medium"><AlertCircle className="h-4 w-4" />{alert.title}</div><p className="mt-1 text-xs text-muted-foreground">{alert.detail}</p><p className="mt-1 text-[11px] text-muted-foreground">Aktif sejak {formatDate(alert.firstSeenAt)} · diperbarui {formatDate(alert.lastSeenAt)}</p></div>)}
               </CardContent>
             </Card>
           </div>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Timer className="h-4 w-4" /> Riwayat eksekusi worker</CardTitle><CardDescription>20 eksekusi scheduler terbaru, termasuk durasi dan hasil batch.</CardDescription></CardHeader>
+            <CardContent>
+              {operations.executionHistory.length === 0 ? <p className="py-3 text-sm text-muted-foreground">Belum ada riwayat eksekusi worker.</p> : <div className="space-y-3">{operations.executionHistory.map(run => <div key={run.runId} className="flex flex-col gap-1 border-b pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Run {run.runId.slice(0, 8)}</p><p className="text-xs text-muted-foreground">{formatDate(run.startedAt)} · {run.durationMs == null ? "Durasi tidak tersedia" : (run.durationMs / 1000).toFixed(1) + " detik"}</p>{run.error && <p className="mt-1 text-xs text-destructive">{run.error}</p>}</div><div className="flex items-center gap-2"><Badge variant={run.status === "success" ? "default" : run.status === "running" ? "secondary" : "destructive"}>{run.status}</Badge><span className="text-xs tabular-nums text-muted-foreground">{run.attempted ?? 0}/{run.eligible ?? 0} diproses</span></div></div>)}</div>}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Timer className="h-4 w-4" /> Aktivitas yang perlu dipantau</CardTitle><CardDescription>Publikasi gagal, upload aktif, dan antrean terjadwal milik akun ini.</CardDescription></CardHeader>
             <CardContent>
