@@ -42,3 +42,19 @@ export function isYoutubeScheduleValid(
   const timestamp = scheduledAt.getTime()
   return Number.isFinite(timestamp) && timestamp >= now + minimumLeadMs
 }
+
+
+export type YoutubeWorkerHealthState = 'ok' | 'running' | 'degraded' | 'unknown'
+
+export function getYoutubeWorkerHealthStatus(input: {
+  staleUploads: number
+  overdueJobs: number
+  heartbeatAgeMs: number | null
+  lastRunStatus: 'running' | 'success' | 'error' | null
+}, staleAfterMs = 15 * 60_000): YoutubeWorkerHealthState {
+  if (input.staleUploads > 0 || input.overdueJobs > 0 || input.lastRunStatus === 'error') return 'degraded'
+  if (input.heartbeatAgeMs !== null && (!Number.isFinite(input.heartbeatAgeMs) || input.heartbeatAgeMs > staleAfterMs)) return 'degraded'
+  if (input.heartbeatAgeMs === null || input.lastRunStatus === null) return 'unknown'
+  if (input.lastRunStatus === 'running') return 'running'
+  return 'ok'
+}

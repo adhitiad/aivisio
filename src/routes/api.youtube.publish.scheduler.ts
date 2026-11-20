@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { db } from '@/lib/db'
 import { runYoutubePublishingBatch } from '@/lib/youtube/publishing-worker'
 import { moduleLogger } from '@/lib/logger'
+import { getYoutubeWorkerHealthStatus } from '@/lib/youtube/publishing-utils'
 
 const log = moduleLogger('youtube-publishing-scheduler')
 const HEARTBEAT_KEY = 'youtube_publishing_worker_last_run'
@@ -66,14 +67,12 @@ async function getObservability() {
   const schedulerAgeMs = heartbeatTimestamp === null || !Number.isFinite(heartbeatTimestamp)
     ? null
     : Math.max(0, now.getTime() - heartbeatTimestamp)
-  const schedulerStale = schedulerAgeMs === null || schedulerAgeMs > STALE_AFTER_MS
-  const status = staleUploads > 0 || overdueJobs > 0 || schedulerStale || lastRun?.status === 'error'
-    ? 'degraded'
-    : lastRun?.status === 'success'
-      ? 'ok'
-      : lastRun?.status === 'running'
-        ? 'running'
-        : 'unknown'
+  const status = getYoutubeWorkerHealthStatus({
+    staleUploads,
+    overdueJobs,
+    heartbeatAgeMs: schedulerAgeMs,
+    lastRunStatus: lastRun?.status ?? null,
+  }, STALE_AFTER_MS)
 
   return {
     status,

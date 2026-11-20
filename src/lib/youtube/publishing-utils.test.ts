@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { calculateYoutubeRetryDelay, hasYoutubeUploadAttemptsRemaining, isYoutubeChannelOwned, isYoutubeObjectReady, isYoutubeUploadAttemptExhausted, isYoutubeScheduleValid, parseYoutubeUploadOffset } from './publishing-utils'
+import { calculateYoutubeRetryDelay, getYoutubeWorkerHealthStatus, hasYoutubeUploadAttemptsRemaining, isYoutubeChannelOwned, isYoutubeObjectReady, isYoutubeUploadAttemptExhausted, isYoutubeScheduleValid, parseYoutubeUploadOffset } from './publishing-utils'
 
 function expectThrows(callback: () => unknown) {
   let didThrow = false
@@ -64,5 +64,38 @@ describe('YouTube scheduled publishing', () => {
     expect(isYoutubeScheduleValid(new Date(now + 11 * 60_000), now)).toBe(true)
     expect(isYoutubeScheduleValid(new Date(now + 9 * 60_000), now)).toBe(false)
     expect(isYoutubeScheduleValid(new Date(now - 1), now)).toBe(false)
+  })
+})
+
+
+describe('YouTube worker observability health', () => {
+  test('does not report an uninitialized worker as healthy', () => {
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 0, heartbeatAgeMs: null, lastRunStatus: null,
+    })).toBe('unknown')
+  })
+
+  test('distinguishes a recent successful or running scheduler', () => {
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 0, heartbeatAgeMs: 60_000, lastRunStatus: 'success',
+    })).toBe('ok')
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 0, heartbeatAgeMs: 60_000, lastRunStatus: 'running',
+    })).toBe('running')
+  })
+
+  test('degrades on stale heartbeats, failed runs, stale leases, and overdue jobs', () => {
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 0, heartbeatAgeMs: 16 * 60_000, lastRunStatus: 'success',
+    })).toBe('degraded')
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 0, heartbeatAgeMs: 60_000, lastRunStatus: 'error',
+    })).toBe('degraded')
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 1, overdueJobs: 0, heartbeatAgeMs: 60_000, lastRunStatus: 'success',
+    })).toBe('degraded')
+    expect(getYoutubeWorkerHealthStatus({
+      staleUploads: 0, overdueJobs: 1, heartbeatAgeMs: 60_000, lastRunStatus: 'success',
+    })).toBe('degraded')
   })
 })

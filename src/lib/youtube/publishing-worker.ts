@@ -103,7 +103,7 @@ async function uploadOne(id: string, now = new Date()): Promise<boolean> {
     },
   })
   if (claim.count !== 1) return false
-  log.info({ publicationId: id, workerId, leaseRecovered: true }, 'YouTube publication lease claimed')
+  log.info({ publicationId: id, workerId }, 'YouTube publication lease claimed')
 
   try {
     const item = await db.youtubePublication.findUnique({ where: { id } })
