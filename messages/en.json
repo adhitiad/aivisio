@@ -444,7 +444,8 @@
       "requiredViews": "Required views",
       "requiredDailyViews": "Required views/day",
       "forecastNotice": "The scenario assumes RPM and average views remain unchanged. The ±20% range is a sensitivity scenario, not a statistical confidence interval."
-    }
+    },
+    "publishing": "YouTube Publishing"
   },
   "studio": {
     "titleA": "5 AI Tools.",

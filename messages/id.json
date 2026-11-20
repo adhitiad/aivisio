@@ -444,7 +444,8 @@
       "requiredViews": "Views yang dibutuhkan",
       "requiredDailyViews": "Views/hari yang dibutuhkan",
       "forecastNotice": "Simulasi mengasumsikan RPM dan rata-rata views tidak berubah. Variasi ±20% adalah skenario sensitivitas, bukan confidence interval statistik."
-    }
+    },
+    "publishing": "Publikasi YouTube"
   },
   "studio": {
     "titleA": "5 Tool AI.",
