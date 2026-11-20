@@ -4,7 +4,7 @@ import { getYoutubeAccessToken } from '@/lib/youtube/oauth'
 import { decryptYoutubeToken, encryptYoutubeToken } from '@/lib/youtube/token-crypto'
 import { getObject, headObject } from '@/lib/storage/neon-object-storage'
 import { moduleLogger } from '@/lib/logger'
-import { parseYoutubeUploadOffset, calculateYoutubeRetryDelay } from '@/lib/youtube/publishing-utils'
+import { parseYoutubeUploadOffset, calculateYoutubeRetryDelay, isYoutubeUploadAttemptExhausted } from '@/lib/youtube/publishing-utils'
 
 const log = moduleLogger('youtube-publisher')
 const API = 'https://www.googleapis.com/upload/youtube/v3/videos'
@@ -88,7 +88,7 @@ async function uploadOne(id: string, now = new Date()) {
       approvedAt: { not: null },
       youtubeVideoId: null,
       OR: [
-        { status: 'scheduled', nextAttemptAt: { lte: now }, uploadAttempts: { lt: 8 } },
+        { status: 'scheduled', nextAttemptAt: { lte: now },  },
         { status: 'uploading', OR: [{ lockedAt: { lt: staleBefore } }, { lockedAt: null }] },
       ],
     },
@@ -106,6 +106,19 @@ async function uploadOne(id: string, now = new Date()) {
   try {
     const item = await db.youtubePublication.findUnique({ where: { id } })
     if (!item || item.status !== 'uploading' || item.lockedBy !== workerId) return
+
+    if (isYoutubeUploadAttemptExhausted(item.uploadAttempts, item.maxUploadAttempts)) {
+      await db.youtubePublication.updateMany({
+        where: { id, status: 'uploading', lockedBy: workerId },
+        data: {
+          status: 'failed',
+          lastError: 'Batas maksimum percobaan upload telah tercapai.',
+          lockedAt: null,
+          lockedBy: null,
+        },
+      })
+      return
+    }
 
     const [connection, project, channel] = await Promise.all([
       db.youtubeOAuthConnection.findFirst({ where: { userId: item.userId, connectionStatus: 'connected' } }),

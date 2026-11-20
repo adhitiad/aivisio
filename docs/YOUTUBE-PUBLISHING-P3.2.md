@@ -15,7 +15,7 @@
 2. Apply schema changes with `bun run db:push` (this repository currently uses Prisma db push and has no checked-in migration history).
 3. Run `bun run db:generate`.
 4. Configure `YOUTUBE_CRON_SECRET` with at least 32 random characters.
-5. Schedule POST `/api/youtube/publish/scheduler` with `Authorization: Bearer <YOUTUBE_CRON_SECRET>` every minute.
+5. Configure the included `.github/workflows/youtube-publishing-worker.yml`: set `AIVISO_BASE_URL` as a repository variable and `YOUTUBE_CRON_SECRET` as a repository secret. It calls POST `/api/youtube/publish/scheduler` every five minutes.
 6. Ensure Google OAuth grants `youtube.upload`. Existing connections must reconnect to grant the scope.
 7. Verify the app server can read completed video objects from Neon Object Storage.
 
@@ -29,3 +29,9 @@
 ## Validation
 
 Run `bun run typecheck`, `bun test src/lib/youtube/publishing-utils.test.ts`, and `bun run build` in the repository environment after applying the schema. A source commit alone does not prove build or database migration success.
+
+## GitHub Actions scheduling caveat
+
+GitHub scheduled workflows execute only from the repository's default branch. The workflow can be manually dispatched from `adhitiad_gpt` for testing, but its five-minute schedule becomes active only after the workflow is merged into the default branch. Keeping `main` untouched means automated schedule activation remains pending until an approved merge or an external scheduler is configured.
+
+The worker now respects each publication's `maxUploadAttempts` value. If a stale worker lease is reclaimed after the configured attempt limit has been exceeded, the publication is marked failed without starting another Google upload.

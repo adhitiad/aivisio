@@ -13,3 +13,8 @@ export function calculateYoutubeRetryDelay(attempt: number, random = Math.random
   const jitter = Number.isFinite(random) ? Math.max(0, Math.min(1, random)) : 0.5
   return Math.round(base * (0.8 + jitter * 0.4))
 }
+
+export function isYoutubeUploadAttemptExhausted(attempt: number, maxAttempts: number): boolean {
+  if (!Number.isFinite(attempt) || !Number.isFinite(maxAttempts)) return true
+  return attempt > Math.max(0, Math.floor(maxAttempts))
+}

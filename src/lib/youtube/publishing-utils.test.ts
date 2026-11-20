@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { calculateYoutubeRetryDelay, parseYoutubeUploadOffset } from './publishing-utils'
+import { calculateYoutubeRetryDelay, isYoutubeUploadAttemptExhausted, parseYoutubeUploadOffset } from './publishing-utils'
 
 describe('parseYoutubeUploadOffset', () => {
   it('converts the inclusive Range end into the next byte offset', () => expect(parseYoutubeUploadOffset('bytes=0-8388607', 20_000_000)).toBe(8_388_608))
@@ -15,5 +15,16 @@ describe('calculateYoutubeRetryDelay', () => {
     expect(calculateYoutubeRetryDelay(1, 0)).toBe(24_000)
     expect(calculateYoutubeRetryDelay(2, 1)).toBe(72_000)
     expect(calculateYoutubeRetryDelay(30, 0.5)).toBe(21_600_000)
+  })
+})
+
+describe('isYoutubeUploadAttemptExhausted', () => {
+  it('allows attempts up to the configured maximum', () => {
+    expect(isYoutubeUploadAttemptExhausted(1, 8)).toBe(false)
+    expect(isYoutubeUploadAttemptExhausted(8, 8)).toBe(false)
+  })
+  it('stops after the configured maximum and rejects invalid counters', () => {
+    expect(isYoutubeUploadAttemptExhausted(9, 8)).toBe(true)
+    expect(isYoutubeUploadAttemptExhausted(Number.NaN, 8)).toBe(true)
   })
 })
