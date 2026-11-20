@@ -183,6 +183,11 @@ model YoutubeChannel {
   metricSnapshots   YoutubeMetricSnapshot[]
   trendSignals      YoutubeTrendSignal[]
   contentIdeas      ContentIdea[]
+  nicheProfile      YoutubeNicheProfile?
+  strategySnapshots YoutubeContentStrategySnapshot[]
+  videoPerformanceSnapshots YoutubeVideoPerformanceSnapshot[]
+  countryPerformanceSnapshots YoutubeCountryPerformanceSnapshot[]
+  revenueForecasts  YoutubeRevenueForecast[]
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 
@@ -257,6 +262,7 @@ model ContentIdea {
   plannedFor        DateTime?
   evidence          String         @default("[]")
   channel           YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  strategySnapshots YoutubeContentStrategySnapshot[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -654,4 +660,129 @@ model MediaAsset {
   @@index([userId, createdAt])
   @@index([videoProjectId, kind])
   @@index([kind, createdAt])
+}
+
+
+// Creator-defined niche, audience, publishing cadence and manually verified YPP data.
+model YoutubeNicheProfile {
+  id                         String         @id @default(uuid(7))
+  channelId                  String         @unique
+  niche                      String         @default("")
+  subNiche                   String?
+  primaryMarket              String         @default("ID")
+  secondaryMarkets           String         @default("[]")
+  audiencePersona            String?
+  audienceProblems           String         @default("[]")
+  channelPositioning         String?
+  contentPillars             String         @default("[]")
+  languages                  String         @default("[\"id\"]")
+  weeklyShorts               Int            @default(3)
+  weeklyLongVideos           Int            @default(1)
+  shortStrategy              String?
+  longFormStrategy           String?
+  targetShortDurationSec     Int            @default(45)
+  targetLongDurationMin      Int            @default(8)
+  defaultHook                String?
+  outlineTemplate             String?
+  callToAction               String?
+  yppValidPublicWatchHours   Float?
+  yppRequiredPublicWatchHours Float?
+  yppValidShortsViews        BigInt?
+  yppRequiredShortsViews     BigInt?
+  yppManualCheckedAt         DateTime?
+  profileVersion             Int            @default(1)
+  channel                    YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+
+  @@index([primaryMarket])
+  @@index([updatedAt])
+}
+
+// Immutable strategy context captured at the time a content idea is created.
+model YoutubeContentStrategySnapshot {
+  id              String         @id @default(uuid(7))
+  channelId       String
+  contentIdeaId   String
+  profileVersion  Int
+  payload         String
+  channel         YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contentIdea     ContentIdea    @relation(fields: [contentIdeaId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([channelId, createdAt])
+  @@index([contentIdeaId])
+  @@index([profileVersion])
+}
+
+// Private per-video observations from YouTube Analytics reports.
+model YoutubeVideoPerformanceSnapshot {
+  id                      String         @id @default(uuid(7))
+  channelId               String
+  videoId                 String
+  videoTitle              String         @default("")
+  capturedOn              DateTime
+  views                   BigInt         @default(0)
+  estimatedMinutesWatched Float          @default(0)
+  averageViewDuration     Float          @default(0)
+  averageViewPercentage   Float          @default(0)
+  impressions             Float?
+  impressionsCtr          Float?
+  estimatedRevenue        Float?
+  estimatedAdRevenue      Float?
+  currencyCode            String         @default("IDR")
+  source                  String         @default("youtube-analytics-api")
+  channel                 YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@unique([channelId, videoId, capturedOn])
+  @@index([channelId, capturedOn])
+  @@index([channelId, views])
+  @@index([videoId, capturedOn])
+}
+
+// Private country-level observations. These are not public market estimates.
+model YoutubeCountryPerformanceSnapshot {
+  id                      String         @id @default(uuid(7))
+  channelId               String
+  countryCode             String
+  capturedOn              DateTime
+  views                   BigInt         @default(0)
+  estimatedMinutesWatched Float          @default(0)
+  estimatedRevenue        Float?
+  estimatedAdRevenue      Float?
+  currencyCode            String         @default("IDR")
+  source                  String         @default("youtube-analytics-api")
+  channel                 YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@unique([channelId, countryCode, capturedOn])
+  @@index([channelId, capturedOn])
+  @@index([countryCode, capturedOn])
+}
+
+// Saved what-if projection. It must never be presented as actual earnings.
+model YoutubeRevenueForecast {
+  id                   String         @id @default(uuid(7))
+  channelId            String
+  targetRevenue        Float
+  currencyCode         String         @default("IDR")
+  assumedRpm           Float
+  baselineDailyViews   Float
+  projectionDays       Int
+  projectedViews       Float
+  lowerForecast        Float
+  upperForecast        Float
+  requiredViews        Float
+  rpmSource            String         @default("manual-assumption") // actual-channel-rpm | manual-assumption
+  assumptions          String         @default("{}")
+  channel              YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([channelId, createdAt])
+  @@index([createdAt])
 }

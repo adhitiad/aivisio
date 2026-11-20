@@ -762,6 +762,195 @@ export async function queryYoutubeAnalytics(input: YoutubeAnalyticsInput) {
   }
 }
 
+
+export type YoutubeOptimizationBreakdownInput = {
+  userId: string
+  channelId: string
+  startDate: string
+  endDate: string
+  includeRevenue: boolean
+}
+
+/**
+ * Fetches private per-video and country reports. Monetary metrics are retried
+ * without revenue after a 403 (for example, a channel that has not joined YPP).
+ * Public Data API counts are intentionally not substituted for private analytics.
+ */
+export async function queryYoutubeOptimizationBreakdowns(input: YoutubeOptimizationBreakdownInput) {
+  const channel = await db.youtubeChannel.findFirst({
+    where: { id: input.channelId, userId: input.userId },
+    select: { id: true, youtubeChannelId: true, oauthConnectionId: true },
+  })
+  if (!channel || !channel.oauthConnectionId) {
+    throw new YoutubeIntegrationError('Channel tidak ditemukan atau belum terhubung melalui OAuth.', 404, 'YOUTUBE_CHANNEL_NOT_FOUND')
+  }
+
+  const start = parseDate(input.startDate)
+  const end = parseDate(input.endDate)
+  const dayCount = Math.floor((end.getTime() - start.getTime()) / 86_400_000)
+  const today = new Date()
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+  if (end < start || end >= todayUtc || dayCount > 364) {
+    throw new YoutubeIntegrationError('Rentang tanggal harus berakhir sebelum hari ini dan maksimal 365 hari.', 400, 'YOUTUBE_ANALYTICS_RANGE_INVALID')
+  }
+
+  const connection = await db.youtubeOAuthConnection.findFirst({
+    where: { id: channel.oauthConnectionId, userId: input.userId, connectionStatus: 'connected' },
+  })
+  if (!connection) {
+    throw new YoutubeIntegrationError('Koneksi Google YouTube tidak aktif. Hubungkan ulang akun.', 401, 'YOUTUBE_RECONNECT_REQUIRED')
+  }
+  const scopes = grantedScopes(connection.scopes)
+  if (REQUIRED_SCOPES.some((scope) => !scopes.includes(scope))) {
+    throw new YoutubeIntegrationError('Akses YouTube Analytics belum diberikan. Hubungkan ulang akun.', 403, 'YOUTUBE_ANALYTICS_SCOPE_REQUIRED')
+  }
+
+  const accessToken = await getYoutubeAccessToken(connection)
+  const fetchReports = async (includeRevenue: boolean) => {
+    const currencyMetrics = includeRevenue ? ['estimatedRevenue', 'estimatedAdRevenue'] : []
+    const fetchReport = async (dimension: 'video' | 'country', metrics: string[], maxResults: number) => {
+      const url = new URL(YOUTUBE_ANALYTICS_ENDPOINT)
+      url.searchParams.set('ids', 'channel==' + channel.youtubeChannelId)
+      url.searchParams.set('startDate', input.startDate)
+      url.searchParams.set('endDate', input.endDate)
+      url.searchParams.set('dimensions', dimension)
+      url.searchParams.set('metrics', [...metrics, ...currencyMetrics].join(','))
+      url.searchParams.set('sort', '-views')
+      url.searchParams.set('maxResults', String(maxResults))
+      url.searchParams.set('currency', 'IDR')
+      return googleJson<AnalyticsResponse>(url, accessToken)
+    }
+    const [videos, countries] = await Promise.all([
+      fetchReport('video', ['views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage'], 200),
+      fetchReport('country', ['views', 'estimatedMinutesWatched'], 200),
+    ])
+    return { videos, countries, includeRevenue }
+  }
+
+  let reports: Awaited<ReturnType<typeof fetchReports>>
+  let revenueAvailable = input.includeRevenue && scopes.includes(MONETARY_SCOPE)
+  if (revenueAvailable) {
+    try {
+      reports = await fetchReports(true)
+    } catch (error) {
+      if (!(error instanceof YoutubeIntegrationError) || error.status !== 403) throw error
+      revenueAvailable = false
+      reports = await fetchReports(false)
+    }
+  } else {
+    reports = await fetchReports(false)
+  }
+
+  const capturedOn = new Date()
+  const mapReport = (
+    response: AnalyticsResponse,
+    dimension: 'video' | 'country',
+  ) => {
+    const headers = (response.columnHeaders ?? []).map((item) => item.name ?? '')
+    const position = (name: string) => headers.indexOf(name)
+    const dimensionIndex = position(dimension)
+    if (dimensionIndex < 0) return []
+    return (response.rows ?? []).flatMap((values) => {
+      const key = String(values[dimensionIndex] ?? '').trim()
+      if (!key || key.length > 128) return []
+      const metric = (name: string) => toMetricNumber(position(name) >= 0 ? values[position(name)] : 0, true)
+      return [{
+        key,
+        views: BigInt(Math.trunc(Math.max(0, metric('views')))),
+        estimatedMinutesWatched: Math.max(0, metric('estimatedMinutesWatched')),
+        averageViewDuration: Math.max(0, metric('averageViewDuration')),
+        averageViewPercentage: Math.max(0, metric('averageViewPercentage')),
+        estimatedRevenue: revenueAvailable ? metric('estimatedRevenue') : null,
+        estimatedAdRevenue: revenueAvailable ? metric('estimatedAdRevenue') : null,
+      }]
+    })
+  }
+
+  const videos = mapReport(reports.videos, 'video')
+  const countries = mapReport(reports.countries, 'country')
+
+  if (videos.length || countries.length) {
+    await db.$transaction([
+      ...videos.map((row) => db.youtubeVideoPerformanceSnapshot.upsert({
+        where: {
+          channelId_videoId_capturedOn: {
+            channelId: channel.id,
+            videoId: row.key,
+            capturedOn,
+          },
+        },
+        create: {
+          channelId: channel.id,
+          videoId: row.key,
+          videoTitle: row.key,
+          capturedOn,
+          views: row.views,
+          estimatedMinutesWatched: row.estimatedMinutesWatched,
+          averageViewDuration: row.averageViewDuration,
+          averageViewPercentage: row.averageViewPercentage,
+          estimatedRevenue: row.estimatedRevenue,
+          estimatedAdRevenue: row.estimatedAdRevenue,
+          currencyCode: 'IDR',
+        },
+        update: {
+          views: row.views,
+          estimatedMinutesWatched: row.estimatedMinutesWatched,
+          averageViewDuration: row.averageViewDuration,
+          averageViewPercentage: row.averageViewPercentage,
+          estimatedRevenue: row.estimatedRevenue,
+          estimatedAdRevenue: row.estimatedAdRevenue,
+        },
+      })),
+      ...countries.map((row) => db.youtubeCountryPerformanceSnapshot.upsert({
+        where: {
+          channelId_countryCode_capturedOn: {
+            channelId: channel.id,
+            countryCode: row.key,
+            capturedOn,
+          },
+        },
+        create: {
+          channelId: channel.id,
+          countryCode: row.key,
+          capturedOn,
+          views: row.views,
+          estimatedMinutesWatched: row.estimatedMinutesWatched,
+          estimatedRevenue: row.estimatedRevenue,
+          estimatedAdRevenue: row.estimatedAdRevenue,
+          currencyCode: 'IDR',
+        },
+        update: {
+          views: row.views,
+          estimatedMinutesWatched: row.estimatedMinutesWatched,
+          estimatedRevenue: row.estimatedRevenue,
+          estimatedAdRevenue: row.estimatedAdRevenue,
+        },
+      })),
+    ])
+  }
+
+  return {
+    capturedOn: capturedOn.toISOString(),
+    revenueAvailable,
+    videos: videos.map((row) => ({
+      videoId: row.key,
+      views: row.views.toString(),
+      estimatedMinutesWatched: row.estimatedMinutesWatched,
+      averageViewDuration: row.averageViewDuration,
+      averageViewPercentage: row.averageViewPercentage,
+      estimatedRevenue: row.estimatedRevenue,
+      estimatedAdRevenue: row.estimatedAdRevenue,
+    })),
+    countries: countries.map((row) => ({
+      countryCode: row.key,
+      views: row.views.toString(),
+      estimatedMinutesWatched: row.estimatedMinutesWatched,
+      estimatedRevenue: row.estimatedRevenue,
+      estimatedAdRevenue: row.estimatedAdRevenue,
+    })),
+  }
+}
+
 function formatPacificDate(date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Los_Angeles',
