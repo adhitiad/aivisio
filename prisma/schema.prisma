@@ -25,6 +25,8 @@ model User {
   accounts      Account[]
   generations   Generation[]
   videoProjects VideoProject[]
+  footageAssets FootageAsset[]
+  thumbnailVariants ThumbnailVariant[]
   youtubeChannels YoutubeChannel[]
   youtubeOAuthConnection YoutubeOAuthConnection?
   youtubeOAuthStates YoutubeOAuthState[]
@@ -131,6 +133,8 @@ model VideoProject {
   filePath        String?
   fileBytes       Int      @default(0)
   scenes          String   @default("[]")
+  videoJob        VideoJob?
+  thumbnailVariants ThumbnailVariant[]
   error           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -552,4 +556,77 @@ model YoutubeOpportunityScoreSnapshot {
   @@index([queryId, score])
   @@index([videoId, capturedAt])
   @@index([capturedAt])
+}
+
+
+model VideoJob {
+  id             String       @id @default(uuid(7))
+  videoProjectId String       @unique
+  status         String       @default("queued") // queued | processing | completed | failed
+  attempts       Int          @default(0)
+  maxAttempts    Int          @default(4)
+  availableAt    DateTime     @default(now())
+  lockedAt       DateTime?
+  heartbeatAt    DateTime?
+  lockedBy       String?
+  lastError      String?
+  completedAt    DateTime?
+  project        VideoProject @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([status, availableAt, createdAt])
+  @@index([status, heartbeatAt])
+  @@index([lockedBy])
+}
+
+model FootageAsset {
+  id                  String   @id @default(uuid(7))
+  userId              String
+  title               String
+  description         String?
+  sourceName          String
+  sourceUrl           String
+  assetUrl            String
+  licenseType         String   @default("unknown")
+  commercialUse       Boolean  @default(false)
+  modificationAllowed Boolean  @default(false)
+  attributionRequired Boolean  @default(false)
+  attributionText     String?
+  rightsEvidenceUrl   String?
+  rightsEvidenceNotes String?
+  reviewStatus        String   @default("pending")
+  reviewNotes         String?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  expiresAt           DateTime?
+  durationSec         Int?
+  tags                String   @default("[]")
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId, reviewStatus, createdAt])
+  @@index([reviewStatus, updatedAt])
+  @@index([licenseType])
+  @@index([expiresAt])
+}
+
+model ThumbnailVariant {
+  id             String       @id @default(uuid(7))
+  userId         String
+  videoProjectId String
+  prompt         String
+  aspect         String       @default("16:9")
+  imagePath      String
+  provider       String       @default("z-ai")
+  model          String?
+  isSelected     Boolean      @default(false)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoProject   VideoProject @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([userId, videoProjectId, createdAt])
+  @@index([videoProjectId, isSelected])
 }
