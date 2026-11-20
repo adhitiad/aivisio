@@ -39,7 +39,10 @@ function safeStrategyContext(snapshotPayload: string | undefined): string {
   const value = parsed as Record<string, unknown>
   const cleanText = (item: unknown, max = 420): string =>
     typeof item === 'string'
-      ? item.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max)
+      ? Array.from(item, (character) => {
+        const codePoint = character.codePointAt(0) ?? 0
+        return codePoint <= 0x1f || codePoint === 0x7f ? ' ' : character
+      }).join('').trim().slice(0, max)
       : ''
   const cleanList = (item: unknown): string[] =>
     Array.isArray(item)
