@@ -43,3 +43,4 @@ pnpm-debug.log*
 .z-ai-config
 local-*
 .output/
+client_secret.json
