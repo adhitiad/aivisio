@@ -26,6 +26,8 @@ model User {
   generations   Generation[]
   videoProjects VideoProject[]
   youtubeChannels YoutubeChannel[]
+  youtubeOAuthConnection YoutubeOAuthConnection?
+  youtubeOAuthStates YoutubeOAuthState[]
   notifications Notification[]
   notificationReadReceipts NotificationReadReceipt[]
   createdAt     DateTime       @default(now())
@@ -139,15 +141,15 @@ model VideoProject {
 }
 
 // ---------------------------------------------------------------------------
-// YouTube Growth Studio — setiap channel dan data analitik milik satu pengguna.
-// Token OAuth tetap dikelola BetterAuth di Account; model di bawah hanya
-// menyimpan referensi account dan data channel yang diperlukan aplikasi.
+// YouTube Growth Studio — private channel data and user-consented OAuth tokens.
+// YouTube OAuth is intentionally separate from BetterAuth sign-in accounts.
 // ---------------------------------------------------------------------------
 
 model YoutubeChannel {
   id                String                  @id @default(uuid(7))
   userId            String
   accountId         String?
+  oauthConnectionId String?
   youtubeChannelId  String                  @unique
   title             String
   handle            String?
@@ -165,6 +167,8 @@ model YoutubeChannel {
   lastSyncedAt      DateTime?
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   account           Account?                @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  oauthConnection   YoutubeOAuthConnection? @relation(fields: [oauthConnectionId], references: [id], onDelete: SetNull)
+  analyticsDailyMetrics YoutubeAnalyticsDailyMetric[]
   goal              YoutubeGoal?
   metricSnapshots   YoutubeMetricSnapshot[]
   trendSignals      YoutubeTrendSignal[]
@@ -174,6 +178,7 @@ model YoutubeChannel {
 
   @@index([userId, createdAt])
   @@index([accountId])
+  @@index([oauthConnectionId])
   @@index([connectionStatus])
 }
 
@@ -389,4 +394,64 @@ model YoutubeApiUsage {
   updatedAt    DateTime @updatedAt
 
   @@index([quotaDate])
+}
+
+
+// Separate Google OAuth connection for private YouTube Data and Analytics scopes.
+model YoutubeOAuthConnection {
+  id                    String          @id @default(uuid(7))
+  userId                String          @unique
+  googleSubject         String?
+  googleEmail           String?
+  accessTokenEncrypted String
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  scopes                String          @default("")
+  connectionStatus      String          @default("connected") // connected | needs_reconnect
+  lastVerifiedAt        DateTime?
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channels              YoutubeChannel[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([connectionStatus])
+  @@index([googleSubject])
+  @@index([createdAt])
+}
+
+// One-time, user-bound OAuth state and PKCE verifier. Raw state is never stored.
+model YoutubeOAuthState {
+  id                    String   @id @default(uuid(7))
+  stateHash             String   @unique
+  userId                String
+  codeVerifierEncrypted String
+  expiresAt             DateTime
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+// Daily private metrics fetched from YouTube Analytics API v2.
+model YoutubeAnalyticsDailyMetric {
+  id                      String         @id @default(uuid(7))
+  channelId               String
+  metricDate              DateTime
+  views                   BigInt         @default(0)
+  estimatedMinutesWatched Float          @default(0)
+  averageViewDuration     Float          @default(0)
+  subscribersGained       Int            @default(0)
+  subscribersLost         Int            @default(0)
+  estimatedRevenue        Float?
+  estimatedAdRevenue      Float?
+  currencyCode            String         @default("IDR")
+  channel                 YoutubeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@unique([channelId, metricDate])
+  @@index([channelId, metricDate])
+  @@index([metricDate])
 }
